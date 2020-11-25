@@ -71,9 +71,6 @@ int main( int argc, char* args[] ) {
     shader.uniform("projectionCamera", projection * camera);
     shader.uniform("dbmvp", biasMatrix * depthProjection * depthCamera * glm::mat4(1.0f));
     shader.uniform("model", model.model);
-    shader.uniform("flatColor", flatColor);
-    shader.uniform("steepColor", steepColor);
-    shader.uniform("steepness", steepness);
     model.render(GL_TRIANGLES);    //Render Model
 
 /*
@@ -87,15 +84,17 @@ int main( int argc, char* args[] ) {
     //image.render();                     //Render Image
 */
 
-/*
-		//Render Clustering to Screen
-		Tiny::view.target(color::black);	//Target Screen
+		if(viewmap){
 
-		billboardshader.use();
-		billboardshader.texture("imageTexture", world.clustering->texture);
-		billboardshader.uniform("model", flat.model);
-		flat.render();
-*/
+			//Render Clustering to Screen
+			Tiny::view.target(color::black);
+
+			billboardshader.use();
+			billboardshader.texture("imageTexture", world.clustering->texture);
+			billboardshader.uniform("model", flat.model);
+			flat.render();
+
+		}
 
 	};
 

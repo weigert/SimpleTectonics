@@ -32,4 +32,9 @@ namespace color{
     glm::vec3 w = glm::vec3(N-1.0f)*glm::vec3(N*N, N, 1);
     return c.x*w.x + c.y*w.y + c.z*w.z;
   }
+
+  glm::vec4 i2rgba(int i){
+    return glm::vec4(((i >>  0) & 0xff),((i >>  8) & 0xff),((i >> 16) & 0xff),((i >> 24) & 0xff));
+  }
+
 }

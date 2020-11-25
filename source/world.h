@@ -117,25 +117,26 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
       int ind = i*w->dim.y+j;
 
       //Sample Color and Cluster Index
-      glm::vec4 col = w->clustering->sample(glm::vec2(i,j));
+      int* inds = w->clustering->sample<int>(glm::vec2(i,j), glm::vec2(2), GL_COLOR_ATTACHMENT0, GL_RGBA);
+      glm::vec4 col = color::i2rgba(inds[0]);
       int aind = col.x + col.y*256 + col.z*256*256;
-      col = w->clustering->sample(glm::vec2(i,j+1));
+      col = color::i2rgba(inds[2]);
       int bind = col.x + col.y*256 + col.z*256*256;
-      col = w->clustering->sample(glm::vec2(i+1,j));
+      col = color::i2rgba(inds[1]);
       int cind = col.x + col.y*256 + col.z*256*256;
-      col = w->clustering->sample(glm::vec2(i+1,j+1));
+      col = color::i2rgba(inds[3]);
       int dind = col.x + col.y*256 + col.z*256*256;
 
       //Add to Position Vector
-      glm::vec3 a = glm::vec3(i, 5.0*w->plates[aind].thickness, j);
-      glm::vec3 b = glm::vec3(i, 5.0*w->plates[bind].thickness, j+1);
-      glm::vec3 c = glm::vec3(i+1, 5.0*w->plates[cind].thickness, j);
+      glm::vec3 a = glm::vec3(i  , 5.0*w->plates[aind].thickness, j  );
+      glm::vec3 b = glm::vec3(i  , 5.0*w->plates[bind].thickness, j+1);
+      glm::vec3 c = glm::vec3(i+1, 5.0*w->plates[cind].thickness, j  );
       glm::vec3 d = glm::vec3(i+1, 5.0*w->plates[dind].thickness, j+1);
 
       //UPPER TRIANGLE
 
       //Get the Color of the Ground (Water vs. Flat)
-      glm::vec3 color = glm::vec3(0.5);
+      glm::vec3 color = glm::vec3(0.8);
 
       //Add Indices
       m->indices.push_back(m->positions.size()/3+0);
