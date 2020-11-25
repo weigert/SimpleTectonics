@@ -109,6 +109,8 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
   m->normals.clear();
   m->colors.clear();
 
+  int* inds = w->clustering->sample<int>(glm::vec2(0), w->dim, GL_COLOR_ATTACHMENT0, GL_RGBA);
+
   //Loop over all positions and add the triangles!
   for(int i = 0; i < w->dim.x-1; i++){
     for(int j = 0; j < w->dim.y-1; j++){
@@ -116,15 +118,13 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
       //Get Index
       int ind = i*w->dim.y+j;
 
-      //Sample Color and Cluster Index
-      int* inds = w->clustering->sample<int>(glm::vec2(i,j), glm::vec2(2), GL_COLOR_ATTACHMENT0, GL_RGBA);
-      glm::vec4 col = color::i2rgba(inds[0]);
+      glm::vec4 col = color::i2rgba(inds[(int)(i*w->dim.y+j)]);
       int aind = col.x + col.y*256 + col.z*256*256;
-      col = color::i2rgba(inds[2]);
+      col = color::i2rgba(inds[(int)(i*w->dim.y+j+1)]);
       int bind = col.x + col.y*256 + col.z*256*256;
-      col = color::i2rgba(inds[1]);
+      col = color::i2rgba(inds[(int)((i+1)*w->dim.y+j)]);
       int cind = col.x + col.y*256 + col.z*256*256;
-      col = color::i2rgba(inds[3]);
+      col = color::i2rgba(inds[(int)((i+1)*w->dim.y+j+1)]);
       int dind = col.x + col.y*256 + col.z*256*256;
 
       //Add to Position Vector

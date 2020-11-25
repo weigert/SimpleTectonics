@@ -15,7 +15,7 @@ The simple approach will not work, needs more complex dynamics.
 - At the boundaries plates go down while they stay in the middle, so having a representation where a single plate can have variable height appears to make sense.
 
 - Individual sections of a plate are therefore also associated with a height or thickness
-- Thickness can decrease or increase depending on 
+- Thickness can decrease or increase depending on
 
 ## Concept
 

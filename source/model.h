@@ -11,8 +11,8 @@ float R = 2.0f*sqrt(4.0f/3.14159265f/K);
 Rendering Stuff
 */
 
-const int WIDTH = 800;
-const int HEIGHT = 800;
+const int WIDTH = 1000;
+const int HEIGHT = 1000;
 
 float zoom = 0.2;
 float zoomInc = 0.005;
@@ -27,8 +27,7 @@ glm::mat4 projection = glm::ortho(-(float)WIDTH*zoom, (float)WIDTH*zoom, -(float
 glm::vec3 viewPos = glm::vec3(SIZE/2.0, 40.0, SIZE/2.0);
 
 //Lighting and Shading
-//glm::vec3 skyCol = glm::vec4(0.64, 0.75, 0.9, 1.0f);
-glm::vec3 skyCol = glm::vec4(0.9, 0.37, 0.36, 1.0f);
+glm::vec3 skyCol = glm::vec4(0.53, 0.22, 0.22, 1.0f);
 glm::vec3 lightPos = glm::vec3(-100.0f, 100.0f, -150.0f);
 glm::vec3 lightCol = glm::vec3(1.0f, 1.0f, 0.9f);
 float lightStrength = 1.4;
