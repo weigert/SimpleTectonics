@@ -1,4 +1,4 @@
-#SimpleTectonics
+# SimpleTectonics
 
 This is my second / third attempt at good plate tectonics.
 
