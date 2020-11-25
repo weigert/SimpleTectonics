@@ -1,0 +1,115 @@
+#include "TinyEngine/TinyEngine.h"
+#include "TinyEngine/include/helpers/color.h"
+#include "TinyEngine/include/helpers/image.h"
+#include <noise/noise.h>
+#include <chrono>
+
+#include "source/poisson.h"
+#include "source/model.h"
+
+#include "source/world.h"
+
+
+int main( int argc, char* args[] ) {
+
+	//Setup Window
+	Tiny::view.vsync = false;
+	Tiny::window("Plate Tectonics Simulation", WIDTH, HEIGHT);
+
+	Tiny::event.handler  = eventHandler;
+	Tiny::view.interface = [](){};
+
+	//Main Class
+	World world;
+
+	//Setup Shaders
+	Shader voronoi({"source/shader/voronoi.vs", "source/shader/voronoi.fs"}, {"in_Quad", "in_Tex", "in_Centroid"});
+	Shader billboardshader({"source/shader/billboard.vs", "source/shader/billboard.fs"}, {"in_Quad", "in_Tex"});
+	Shader shader({"source/shader/default.vs", "source/shader/default.fs"}, {"in_Position", "in_Normal", "in_Color"});
+	Shader depth({"source/shader/depth.vs", "source/shader/depth.fs"}, {"in_Position"});
+  Shader effect({"source/shader/effect.vs", "source/shader/effect.fs"}, {"in_Quad", "in_Tex"});
+
+	//Utility Classes
+	Square2D flat;
+	Model model(tectonicmesh, &world);
+
+	Billboard shadow(2000, 2000, true);
+	Billboard image(WIDTH, HEIGHT, false); //1200x800, depth only
+
+	//Prepare instance render of flat, per-centroid
+	Instance instance(&flat);
+	instance.addBuffer(world.centroids);
+
+	int n = 0;
+	float us = 0.0; //Rolling average execution time calculation in microseconds (us)
+
+	world.cluster(&voronoi, &instance);
+	model.construct(tectonicmesh, &world); //Reconstruct Updated Model
+
+	Tiny::view.pipeline = [&](){
+
+		/*
+				Convert this into a heightmap!
+		*/
+
+		//Render Shadowmap
+		shadow.target();                  //Prepare Target
+		depth.use();                      //Prepare Shader
+		model.model = glm::translate(glm::mat4(1.0), -viewPos);
+		depth.uniform("dmvp", depthProjection * depthCamera * model.model);
+		model.render(GL_TRIANGLES);       //Render Model
+
+		//Regular Image
+    //image.target(skyCol);           //Prepare Target
+		Tiny::view.target(skyCol);
+		shader.use();                   //Prepare Shader
+		shader.texture("shadowMap", shadow.depth);
+    shader.uniform("lightCol", lightCol);
+    shader.uniform("lightPos", lightPos);
+    shader.uniform("lookDir", lookPos-cameraPos);
+    shader.uniform("lightStrength", lightStrength);
+    shader.uniform("projectionCamera", projection * camera);
+    shader.uniform("dbmvp", biasMatrix * depthProjection * depthCamera * glm::mat4(1.0f));
+    shader.uniform("model", model.model);
+    shader.uniform("flatColor", flatColor);
+    shader.uniform("steepColor", steepColor);
+    shader.uniform("steepness", steepness);
+    model.render(GL_TRIANGLES);    //Render Model
+
+/*
+    //Render to Screen
+    Tiny::view.target(color::black);    //Prepare Target
+    effect.use();                //Prepare Shader
+		effect.texture("imageTexture", image.texture);
+		effect.texture("depthTexture", image.depth);
+		effect.uniform("model", flat.model);
+		flat.render();
+    //image.render();                     //Render Image
+*/
+
+/*
+		//Render Clustering to Screen
+		Tiny::view.target(color::black);	//Target Screen
+
+		billboardshader.use();
+		billboardshader.texture("imageTexture", world.clustering->texture);
+		billboardshader.uniform("model", flat.model);
+		flat.render();
+*/
+
+	};
+
+	Tiny::loop([&](){ //Execute every frame
+
+		if(animate){
+			world.drift(&instance);
+			world.cluster(&voronoi, &instance);
+			model.construct(tectonicmesh, &world); //Reconstruct Updated Model
+		}
+
+	});
+
+	Tiny::quit();
+
+	return 0;
+}
