@@ -73,26 +73,22 @@ public:
 
   glm::vec2 force(double* hm){
 
-/*
     glm::ivec2 i = pos;
-    std::cout<<i.x<<" "<<i.y<<std::endl;
-
     float fx, fy = 0.0f;
 
-
-    if(i.x <= 2) fx = 0.0f;
-    else if(i.x >= SIZE-2) fx = 0.0f;
-    else if((i.x+1)*SIZE+i.y < SIZE*SIZE && (i.x-1)*SIZE+i.y >= 0)
+    //Fully in Bound
+    if(i.x > 0 && i.x < SIZE-1 && i.y > 0 && i.y < SIZE-1){
       fx = (hm[(i.x+1)*SIZE+i.y] - hm[(i.x-1)*SIZE+i.y])/2.0f;
+      fy = (hm[i.x*SIZE+i.y+1] - hm[i.x*SIZE+i.y-1])/2.0f;
+    }
 
-    if(i.y <= 2) fy = 0.0;
-    else if(i.y >= SIZE-2) fy = 0.0;
-    else fy = (hm[i.x*SIZE+i.y+1] - hm[i.x*SIZE+i.y-1])/2.0f;
+    if(i.x <= 0) fx = 0.1f;
+    else if(i.x >= SIZE-1) fx = -0.1f;
+
+    if(i.y <= 0) fy = 0.1;
+    else if(i.y >= SIZE-1) fy = -0.1f;
 
     return glm::vec2(fx,fy);
-*/
-
-    return glm::vec2((float)(rand()%2001)/1000.0f-1.0f, (float)(rand()%2001)/1000.0f-1.0f);
 
   }
 
@@ -109,6 +105,7 @@ double angle(glm::vec2 d){
   if(d.x < 0) a += PI;
 
   return a;
+
 }
 
 struct Plate {
@@ -119,10 +116,10 @@ struct Plate {
   glm::vec2 speed = glm::vec2(0);
   float rotation = 0.0f;
   float angveloc = 0.0f;
-  float dt = 0.02f;
   float mass = 0.0f;
   float inertia = 0.0f;
 
+  const float dt = 0.02f;
   const float convection = 200.0f;
 
   void recenter(vector<vec2>& centroids){
@@ -160,20 +157,19 @@ struct Plate {
     //Move Plate
     pos += dt*speed;
     rotation += dt*angveloc;
-
     if(rotation > 2*PI) rotation -= 2*PI;
     if(rotation < 0) rotation += 2*PI;
 
     glm::vec2 dir;
-    float angle3;
+    float _angle;
 
     //Move Segments
     for(int i = 0; i < segments.size(); i++){
 
       dir = c[segments[i]] - (pos - dt*speed);
-      angle3 = angle(dir) -  (rotation - dt*angveloc);
+      _angle = angle(dir) -  (rotation - dt*angveloc);
 
-      c[segments[i]] = pos + length(dir)*vec2(cos(rotation+angle3),sin(rotation+angle3));
+      c[segments[i]] = pos + length(dir)*vec2(cos(rotation+_angle),sin(rotation+_angle));
       s[segments[i]].pos = c[segments[i]];
 
     }
@@ -254,8 +250,6 @@ void World::initialize(){
     Plate plate;
     plate.pos = glm::vec2(rand()%SIZE,rand()%SIZE);
     plates.push_back(plate);
-
-    //std::cout<<plate.center.x<<" "<<plate.center.y<<std::endl;
 
   }
 
