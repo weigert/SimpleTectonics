@@ -1,5 +1,5 @@
 //GPU Accelerated Voronoi Controller Stuff
-bool animate = true;
+bool animate = false;
 bool viewmap = false;
 
 float K = 2048;
@@ -12,7 +12,7 @@ Rendering Stuff
 */
 
 const int WIDTH = 1000;
-const int HEIGHT = 1000;
+const int HEIGHT = 800;
 
 float zoom = 0.2;
 float zoomInc = 0.005;

@@ -19,8 +19,11 @@ int main( int argc, char* args[] ) {
 	Tiny::event.handler  = eventHandler;
 	Tiny::view.interface = [](){};
 
-	//Main Class
-	World world;
+	//Generate Seeded World
+	int SEED = time(NULL);
+	if(argc == 2)
+		SEED = std::stoi(args[1]);
+	World world(SEED);
 
 	//Setup Shaders
 	Shader voronoi({"source/shader/voronoi.vs", "source/shader/voronoi.fs"}, {"in_Quad", "in_Tex", "in_Centroid"});
@@ -90,10 +93,11 @@ int main( int argc, char* args[] ) {
 		if(viewmap){
 
 			//Render Clustering to Screen
-			Tiny::view.target(glm::vec3(1));
+	//		Tiny::view.target(glm::vec3(1));
 			billboardshader.use();
 			billboardshader.texture("imageTexture", world.clustering->texture);
 			//billboardshader.texture("imageTexture", map.texture);
+			flat.move(glm::vec3(-1.0+0.25/WIDTH*HEIGHT,1.0-0.25,0.0), 0, glm::vec3(1.0f*0.25/WIDTH*HEIGHT,0.25,0.0));
 			billboardshader.uniform("model", flat.model);
 			flat.render();
 

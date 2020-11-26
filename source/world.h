@@ -54,18 +54,18 @@ using namespace glm;
 struct Litho{
 public:
 
-  Litho(glm::vec2 p){
+  Litho(glm::vec2* p){
     pos = p;
   }
 
-  Litho(float d, float t, glm::vec2 p){
+  Litho(float d, float t, glm::vec2* p){
     density = d; thickness = t; pos = p;
   }
 
   float density = 0.5f;
   float thickness = 0.0f;
   float height = 0.0f;
-  glm::vec2 pos;
+  glm::vec2* pos;
 
   void buoyancy(){
     height = thickness*(1-density);
@@ -73,7 +73,7 @@ public:
 
   glm::vec2 force(double* hm){
 
-    glm::ivec2 i = pos;
+    glm::ivec2 i = *pos;
     float fx, fy = 0.0f;
 
     //Fully in Bound
@@ -124,26 +124,26 @@ struct Plate {
 
   void recenter(vector<vec2>& centroids){
     pos = glm::vec2(0);
-    for(int i = 0; i < segments.size(); i++)
-      pos += centroids[segments[i]];
+    for(auto&i: segments)
+      pos += centroids[i];
     pos /= glm::vec2(segments.size());
 
     //Mass and Inertia
     mass = segments.size();
-    for(int i = 0; i < segments.size(); i++)
-      inertia += pow(length(pos-centroids[segments[i]]),2);
+    for(auto&i: segments)
+      inertia += pow(length(pos-centroids[i]),2);
   }
 
-  void convect(double* hm, std::vector<Litho>& s, vector<vec2>& c){
+  void convect(double* hm, std::vector<Litho>& s){
 
     glm::vec2 acc = glm::vec2(0);
     float torque = 0.0f;
 
     //Compute Acceleration and Torque
-    for(int i = 0; i < segments.size(); i++){
+    for(auto&i: segments){
 
-      glm::vec2 f = s[segments[i]].force(hm);
-      glm::vec2 dir = c[segments[i]]-pos;
+      glm::vec2 f = s[i].force(hm);
+      glm::vec2 dir = *s[i].pos-pos;
 
       acc += convection*f;
       torque += convection*length(dir)*length(f)*sin(angle(f)-angle(dir));
@@ -164,32 +164,24 @@ struct Plate {
     float _angle;
 
     //Move Segments
-    for(int i = 0; i < segments.size(); i++){
+    for(auto&i: segments){
 
-      dir = c[segments[i]] - (pos - dt*speed);
+      dir = *s[i].pos - (pos - dt*speed);
       _angle = angle(dir) -  (rotation - dt*angveloc);
 
-      c[segments[i]] = pos + length(dir)*vec2(cos(rotation+_angle),sin(rotation+_angle));
-      s[segments[i]].pos = c[segments[i]];
+      *s[i].pos = pos + length(dir)*vec2(cos(rotation+_angle),sin(rotation+_angle));
 
     }
 
   }
 
-  void grow(double* hm, std::vector<Litho>& s, std::vector<vec2>& c){
-
-    /*
-        Idea: Grow plates slowly towards some maximum height...
-        Then: Density varies depending on where they grow
-
-        Moving away from hotter regions...
-    */
+  void grow(double* hm, std::vector<Litho>& s){
 
     for(auto&i: segments){
-      glm::ivec2 ip = c[i];
+
+      glm::ivec2 ip = *s[i].pos;
 
       float G = 0.01f*(1.0-s[i].thickness);
-      //Growth Rate
 
       if(ip.x >= 0 && ip.x < SIZE-1 &&
       ip.y >= 0 && ip.y < SIZE-1){
@@ -213,10 +205,12 @@ struct Plate {
 class World {
 public:
 
-  World(){
+  World(int _SEED){
 
-    SEED = time(NULL);
+    SEED = _SEED;
     srand(SEED);
+
+    std::cout<<"SEED: "<<SEED<<std::endl;
 
     perlin.SetOctaveCount(4);
     perlin.SetFrequency(1.0);
@@ -287,7 +281,7 @@ void World::initialize(){
   sample::disc(centroids, K, glm::vec2(0), glm::vec2(256));
 
   for(int i = 0; i < centroids.size(); i++){
-    Litho newseg(0.5f, 0.0, centroids[i]); //Properly Scaled Position
+    Litho newseg(0.5f, 0.0, &centroids[i]); //Properly Scaled Position
     segments.push_back(newseg);
 
     int nearest = rand()%nplates;
@@ -323,8 +317,8 @@ void World::cluster(Shader* voronoi, Instance* inst){
 void World::drift(Instance* inst){
 
   for(auto& p: plates){
-    p.convect(heatmap, segments, centroids);
-    p.grow(heatmap, segments, centroids);
+    p.convect(heatmap, segments);
+    p.grow(heatmap, segments);
   }
 
   inst->updateBuffer(centroids, 0);
