@@ -1,8 +1,8 @@
 //GPU Accelerated Voronoi Controller Stuff
-bool animate = false;
+bool animate = true;
 bool viewmap = false;
 
-float K = 512;
+float K = 2048;
 float R = 2.0f*sqrt(4.0f/3.14159265f/K);
 
 #define SIZE 256
@@ -27,7 +27,10 @@ glm::mat4 projection = glm::ortho(-(float)WIDTH*zoom, (float)WIDTH*zoom, -(float
 glm::vec3 viewPos = glm::vec3(SIZE/2.0, 40.0, SIZE/2.0);
 
 //Lighting and Shading
-glm::vec3 skyCol = glm::vec4(0.53, 0.22, 0.22, 1.0f);
+//glm::vec3 skyCol = glm::vec4(0.53, 0.22, 0.22, 1.0f);
+glm::vec3 skyCol = glm::vec4(0.92, 0.82, 0.64, 1.0f);
+
+
 glm::vec3 lightPos = glm::vec3(-100.0f, 100.0f, -150.0f);
 glm::vec3 lightCol = glm::vec3(1.0f, 1.0f, 0.9f);
 float lightStrength = 1.4;

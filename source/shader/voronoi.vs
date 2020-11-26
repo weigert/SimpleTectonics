@@ -16,8 +16,8 @@ vec3 color(int i){
 }
 
 void main(){
-  ex_Centroid = in_Centroid;
+  ex_Centroid = in_Centroid/128.0f-1.0f;
   ex_Color = color(gl_InstanceID);
-  ex_Quad =  R*in_Quad+in_Centroid;
+  ex_Quad =  R*in_Quad+ex_Centroid;
   gl_Position = vec4(ex_Quad, 0.0, 1.0);
 }

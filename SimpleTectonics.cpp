@@ -46,6 +46,9 @@ int main( int argc, char* args[] ) {
 	world.cluster(&voronoi, &instance);
 	model.construct(tectonicmesh, &world); //Reconstruct Updated Model
 
+	//Setup 2D Images
+  Billboard map(image::make<double>(world.dim, world.heatmap, heatmap));
+
 	Tiny::view.pipeline = [&](){
 
 		/*
@@ -87,10 +90,10 @@ int main( int argc, char* args[] ) {
 		if(viewmap){
 
 			//Render Clustering to Screen
-			Tiny::view.target(color::black);
-
+			Tiny::view.target(glm::vec3(1));
 			billboardshader.use();
 			billboardshader.texture("imageTexture", world.clustering->texture);
+			//billboardshader.texture("imageTexture", map.texture);
 			billboardshader.uniform("model", flat.model);
 			flat.render();
 

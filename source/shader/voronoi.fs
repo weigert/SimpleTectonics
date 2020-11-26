@@ -13,5 +13,6 @@ float L2(vec2 a, vec2 b){
 
 void main(){
   gl_FragDepth = L2(ex_Quad, ex_Centroid);
+  if(gl_FragDepth > R) discard;
   fragColor = vec4(ex_Color, 1.0);
 }
