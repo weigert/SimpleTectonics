@@ -63,12 +63,12 @@ public:
   }
 
   float density = 0.5f;
-  float thickness = 1.0f;
+  float thickness = 0.0f;
   float height = 0.0f;
   glm::vec2 pos;
 
-  float mass(){
-    return density*thickness;
+  void buoyancy(){
+    height = thickness*(1-density);
   }
 
   glm::vec2 force(double* hm){
@@ -176,6 +176,36 @@ struct Plate {
 
   }
 
+  void grow(double* hm, std::vector<Litho>& s, std::vector<vec2>& c){
+
+    /*
+        Idea: Grow plates slowly towards some maximum height...
+        Then: Density varies depending on where they grow
+
+        Moving away from hotter regions...
+    */
+
+    for(auto&i: segments){
+      glm::ivec2 ip = c[i];
+
+      float G = 0.01f*(1.0-s[i].thickness);
+      //Growth Rate
+
+      if(ip.x >= 0 && ip.x < SIZE-1 &&
+      ip.y >= 0 && ip.y < SIZE-1){
+
+        float nd = 1.0-hm[ip.y+ip.x*SIZE]; //Hotter = Less Dense
+
+        s[i].density = s[i].density*(s[i].thickness+nd*G/s[i].density)/(G+s[i].thickness);
+        s[i].thickness += G;
+
+      }
+
+      s[i].buoyancy();
+
+    }
+  }
+
 };
 
 //Prepare Noise for jiggling the centroids
@@ -257,8 +287,7 @@ void World::initialize(){
   sample::disc(centroids, K, glm::vec2(0), glm::vec2(256));
 
   for(int i = 0; i < centroids.size(); i++){
-    float t = (float)(rand()%100)/100.0f;
-    Litho newseg(0.5f, t, centroids[i]); //Properly Scaled Position
+    Litho newseg(0.5f, 0.0, centroids[i]); //Properly Scaled Position
     segments.push_back(newseg);
 
     int nearest = rand()%nplates;
@@ -293,8 +322,10 @@ void World::cluster(Shader* voronoi, Instance* inst){
 
 void World::drift(Instance* inst){
 
-  for(auto& p: plates)
+  for(auto& p: plates){
     p.convect(heatmap, segments, centroids);
+    p.grow(heatmap, segments, centroids);
+  }
 
   inst->updateBuffer(centroids, 0);
 
@@ -338,13 +369,13 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
       d = glm::vec3(i+1, 0.0, j+1);
 
       if( aind < w->segments.size() )
-        a = glm::vec3(i  , 5.0*w->segments[aind].thickness, j  );
+        a = glm::vec3(i  , 10.0*w->segments[aind].height, j  );
       if( bind < w->segments.size() )
-        b = glm::vec3(i  , 5.0*w->segments[bind].thickness, j+1);
+        b = glm::vec3(i  , 10.0*w->segments[bind].height, j+1);
       if( cind < w->segments.size() )
-        c = glm::vec3(i+1, 5.0*w->segments[cind].thickness, j  );
+        c = glm::vec3(i+1, 10.0*w->segments[cind].height, j  );
       if( dind < w->segments.size() )
-        d = glm::vec3(i+1, 5.0*w->segments[dind].thickness, j+1);
+        d = glm::vec3(i+1, 10.0*w->segments[dind].height, j+1);
 
       glm::vec3 stonecolor = glm::vec3(0.8);
       glm::vec3 magmacolor = glm::vec3(0.84,0.17,0.05);
