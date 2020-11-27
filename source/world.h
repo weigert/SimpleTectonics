@@ -62,15 +62,11 @@ public:
     density = d; thickness = t; pos = p;
   }
 
+  glm::vec2* pos;
   float density = 0.5f;
   float thickness = 0.0f;
   float height = 0.0f;
-  glm::vec2* pos;
   bool colliding = false;
-
-  void buoyancy(){
-    height = thickness*(1-density);
-  }
 
   glm::vec2 force(double* hm){
 
@@ -123,19 +119,19 @@ struct Plate {
   const float dt = 0.02f;
   const float convection = 200.0f;
 
-  void recenter(vector<vec2>& centroids){
+  void recenter(vector<Litho>& s){
     pos = glm::vec2(0);
     for(auto&i: segments)
-      pos += centroids[i];
+      pos += *s[i].pos;
     pos /= glm::vec2(segments.size());
 
     //Mass and Inertia
     mass = segments.size();
     for(auto&i: segments)
-      inertia += pow(length(pos-centroids[i]),2);
+      inertia += pow(length(pos-*s[i].pos),2);
   }
 
-  void convect(double* hm, std::vector<Litho>& s){
+  void convect(double* hm, vector<Litho>& s){
 
     glm::vec2 acc = glm::vec2(0);
     float torque = 0.0f;
@@ -194,7 +190,8 @@ struct Plate {
 
       }
 
-      s[i].buoyancy();
+      //Compute Buoyancy
+      s[i].height = s[i].thickness*(1-s[i].density);
 
     }
   }
@@ -265,39 +262,6 @@ struct Plate {
       //std::cout<<sind<<std::endl;
 
     }
-
-
-/*
-    //Iterate over all segments and test for intruders randomly
-    for(auto& i: segments){
-
-      glm::vec2 scan;
-
-    //  std::cout<<i<<": "<<s[i].pos->x<<" "<<s[i].pos->y<<std::endl;
-
-      for(int j = 0; j < 5; j++){
-        //Get the values at those positions
-
-        //Scan in a pentagon?
-        scan = glm::vec2(0);//R/2.0f*glm::vec2(cos(2.0f*PI/(float)(j+1)),sin(2.0f*PI/(float)(j+1)));
-        scan += *s[i].pos;
-
-        if( scan.x >= SIZE || scan.x < 0 ||
-            scan.y >= SIZE || scan.y < 0) continue;
-
-        glm::vec4 col = color::i2rgba(c[0]);
-        int ind = col.x + col.y*256 + col.z*256*256;
-
-      //  std::cout<<ind<<" "<<i<<std::endl;
-      //  if(ind == i) std::cout<<"Same"<<std::endl;
-    //    else std::cout<<"Collision"<<std::endl;
-        //Mass Transfer with this lad
-
-
-      }
-
-    }
-    */
 
   }
 
@@ -406,7 +370,7 @@ void World::initialize(){
   }
 
   for(int j = 0; j < nplates; j++)
-    plates[j].recenter(centroids);
+    plates[j].recenter(segments);
 
 }
 
@@ -417,6 +381,7 @@ void World::cluster(Shader* voronoi, Instance* inst){
   voronoi->uniform("R", R);
   voronoi->uniform("depthmap", false);
   inst->render();
+
   depthmap->target(glm::vec3(1));
   voronoi->use();
   voronoi->uniform("R", R);
@@ -427,7 +392,8 @@ void World::cluster(Shader* voronoi, Instance* inst){
 
 void World::drift(Instance* inst){
 
-  int* c =clustering->sample<int>(glm::vec2(0), dim, GL_COLOR_ATTACHMENT0, GL_RGBA);
+  //This could be causing garbage collection issues, not sure
+  int* c = clustering->sample<int>(glm::vec2(0), dim, GL_COLOR_ATTACHMENT0, GL_RGBA);
 
   for(auto& p: plates){
     p.convect(heatmap, segments);
