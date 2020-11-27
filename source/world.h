@@ -107,7 +107,7 @@ double angle(glm::vec2 d){
 
 struct Plate {
 
-  std::vector<int> segments;
+  std::vector<Litho*> seg;
 
   glm::vec2 pos;
   glm::vec2 speed = glm::vec2(0);
@@ -119,28 +119,34 @@ struct Plate {
   const float dt = 0.02f;
   const float convection = 200.0f;
 
-  void recenter(vector<Litho>& s){
-    pos = glm::vec2(0);
-    for(auto&i: segments)
-      pos += *s[i].pos;
-    pos /= glm::vec2(segments.size());
+  void recenter(){
 
-    //Mass and Inertia
-    mass = segments.size();
-    for(auto&i: segments)
-      inertia += pow(length(pos-*s[i].pos),2);
+      pos = glm::vec2(0);
+
+      for(int i = 0; i < seg.size(); i++){
+        pos += glm::vec2((*seg[i]).pos->x, (*seg[i]).pos->y);
+      }
+      pos /= glm::vec2(seg.size());
+
+      //Mass and Inertia
+      mass = seg.size();
+      for(int i = 0; i < seg.size(); i++){
+        inertia += pow(length(pos-*(seg[i]->pos)),2);
+      }
+
   }
 
-  void convect(double* hm, vector<Litho>& s){
+  void convect(double* hm){
 
     glm::vec2 acc = glm::vec2(0);
     float torque = 0.0f;
 
     //Compute Acceleration and Torque
-    for(auto&i: segments){
+    for(int i = 0 ; i < seg.size(); i++){
+      Litho* s = seg[i];
 
-      glm::vec2 f = s[i].force(hm);
-      glm::vec2 dir = *s[i].pos-pos;
+      glm::vec2 f = s->force(hm);
+      glm::vec2 dir = *(s->pos)-pos;
 
       acc += convection*f;
       torque += convection*length(dir)*length(f)*sin(angle(f)-angle(dir));
@@ -161,42 +167,44 @@ struct Plate {
     float _angle;
 
     //Move Segments
-    for(auto&i: segments){
+    for(int i = 0 ; i < seg.size(); i++){
+      Litho* s = seg[i];
 
-      dir = *s[i].pos - (pos - dt*speed);
+      dir = *(s->pos) - (pos - dt*speed);
       _angle = angle(dir) -  (rotation - dt*angveloc);
 
-      *s[i].pos = pos + length(dir)*vec2(cos(rotation+_angle),sin(rotation+_angle));
+      *(s->pos) = pos + length(dir)*vec2(cos(rotation+_angle),sin(rotation+_angle));
 
     }
 
   }
 
-  void grow(double* hm, std::vector<Litho>& s){
+  void grow(double* hm){
 
-    for(auto&i: segments){
+    for(int i = 0 ; i < seg.size(); i++){
+      Litho* s = seg[i];
 
-      glm::ivec2 ip = *s[i].pos;
+      glm::ivec2 ip = *(s->pos);
 
-      float G = 0.01f*(1.0-s[i].thickness);
+      float G = 0.01f*(1.0-s->thickness);
 
       if(ip.x >= 0 && ip.x < SIZE-1 &&
       ip.y >= 0 && ip.y < SIZE-1){
 
         float nd = 1.0-hm[ip.y+ip.x*SIZE]; //Hotter = Less Dense
 
-        s[i].density = s[i].density*(s[i].thickness+nd*G/s[i].density)/(G+s[i].thickness);
-        s[i].thickness += G;
+        s->density = s->density*(s->thickness+nd*G/s->density)/(G+s->thickness);
+        s->thickness += G;
 
       }
 
       //Compute Buoyancy
-      s[i].height = s[i].thickness*(1-s[i].density);
+      s->height = s->thickness*(1-s->density);
 
     }
   }
 
-  void collide(int* c, std::vector<Litho>& s){
+  void collide(int* c, vector<vec2>& centroids, vector<Litho*> segs){
 
     /*
         Iterate over the segments in your guy, identify ones which have
@@ -208,51 +216,85 @@ struct Plate {
         Inside a segment, you can't collide with yourself! No need to track.
     */
 
+    for(int i = 0 ; i < seg.size(); i++){
 
-    for(auto& i: segments){
+      Litho* s = seg[i];
+      s->colliding = false;
 
-      glm::vec2 scan;
-
-      s[i].colliding = false;
+      glm::vec2 scan = *(s->pos);
+      int cmind = (int)scan.y*SIZE+(int)scan.x;
+      glm::vec4 col = color::i2rgba(c[cmind]);
+      int csind = col.x + col.y*256 + col.z*256*256;
 
       int n = 8;
       for(int j = 0; j < n; j++){
 
-        scan = *s[i].pos;
-        scan += 256.0f*R/10.0f*glm::vec2(cos((float)j/(float)n*2.0f*PI), sin((float)j/(float)n*2.0f*PI));
+        //Reset and Shift
+        scan = *(s->pos);
+        scan += 256.0f*R/8.0f*glm::vec2(cos((float)j/(float)n*2.0f*PI), sin((float)j/(float)n*2.0f*PI));
 
+        //Extract Scan Index
         if( scan.x >= SIZE || scan.x < 0 ||
             scan.y >= SIZE || scan.y < 0) continue;
 
-        //std::cout<<i<<": "<<s[i].pos->x<<" "<<s[i].pos->y<<std::endl;
-
-        //Scan Position on Map
+        //Get Scan Index
         int mapind = (int)scan.y*SIZE+(int)scan.x; //This is flipped for some reason in the texture
-
-        glm::vec4 col = color::i2rgba(c[mapind]);
+        col = color::i2rgba(c[mapind]);
         int segind = col.x + col.y*256 + col.z*256*256;
 
-        //Collision between segment i and sind (for visualization)
-        if(segind == i) continue;
+        if(segind == csind) continue;
+        s->colliding = true;
 
-        s[i].colliding = true;
+        /* What happens during a collision event? */
 
-        if(s[i].density > s[segind].density){
-          s[i].thickness -= 0.05*s[i].thickness;
+        /*
+            Find the guy we are colliding with,
+            determine if we are above or below them.
+            Subduce if we are below density.
+
+            Otherwise they will do the same later.
+
+            Then if the proximity is too large, we delete.
+
+
+        */
+
+        std::cout<<"Ay"<<std::endl;
+
+        //We no longer track this segment as our own
+        seg.erase(seg.begin()+i);
+        i--;
+        recenter();
+
+        std::cout<<"Ay2"<<std::endl;
+        break;
+
+        //Delete this centroid from the index
+        /*
+        centroids.erase(centroids.begin()+csind);
+        segs.erase(segs.begin()+csind);
+        delete s;
+        */
+/*
+        if(s->density > s->density){
+          s->thickness -= 0.05*s->thickness;
 
           //Now: Remove elements from the vector!
 
-          if(s[i].thickness < 0.0001);
+          if(s->thickness < 0.0001);
           //Delete the centroid and simultaneously
             //Remove guy
         }
+        */
+        /*
         else{
           s[segind].thickness -= 0.05*s[segind].thickness;
-        }
+        }*/
 
       //  if(s[i].thickness < )
 
 
+      //std::cout<<"Ayy3"<<std::endl;
 
       }
 
@@ -262,6 +304,8 @@ struct Plate {
       //std::cout<<sind<<std::endl;
 
     }
+
+    //std::cout<<"Ayy2"<<std::endl;
 
   }
 
@@ -292,6 +336,9 @@ public:
 
   ~World(){
     delete clustering;
+
+    for(int i = 0; i < segments.size(); i++)
+      delete segments[i];
   }
 
   //General Information
@@ -303,10 +350,10 @@ public:
   double heatmap[SIZE*SIZE]; //Raw Pointer Array (lmao)
 
   //Plate Centroids
-  std::vector<glm::vec2> centroids; //Raw Position Buffer
-  std::vector<Litho> segments; //Raw Position Buffer
+  vector<vec2> centroids;  //Raw Position Buffer
+  vector<Litho*> segments; //Segment Pointer Buffer
 
-  std::vector<Plate> plates;        //Additional Data
+  vector<Plate> plates;        //Additional Data
   const int nplates = 12;
 
   Billboard* clustering;
@@ -350,7 +397,7 @@ void World::initialize(){
   sample::disc(centroids, K, glm::vec2(0), glm::vec2(256));
 
   for(int i = 0; i < centroids.size(); i++){
-    Litho newseg(0.5f, 0.0, &centroids[i]); //Properly Scaled Position
+    Litho* newseg = new Litho(0.5f, 0.0, &centroids[i]); //Properly Scaled Position
     segments.push_back(newseg);
 
     int nearest = rand()%nplates;
@@ -365,12 +412,16 @@ void World::initialize(){
     }
 
     //Add References
-    plates[nearest].segments.push_back(i);
+    plates[nearest].seg.push_back(newseg);
 
   }
 
+  /*
+      Basically the litho array changes size so I have to do the assigments all at once?
+  */
+
   for(int j = 0; j < nplates; j++)
-    plates[j].recenter(segments);
+    plates[j].recenter();
 
 }
 
@@ -395,10 +446,22 @@ void World::drift(Instance* inst){
   //This could be causing garbage collection issues, not sure
   int* c = clustering->sample<int>(glm::vec2(0), dim, GL_COLOR_ATTACHMENT0, GL_RGBA);
 
+  /*
+  Testing this shit again...
+  */
+
+/*
+  glm::vec4 col = color::i2rgba(c[SIZE*SIZE-1-SIZE+1]);
+  int segind = col.x + col.y*256 + col.z*256*256;
+  std::cout<<segind;
+  std::cout<<" "<<segments[segind]->pos->x<<" "<<segments[segind]->pos->y<<std::endl;
+  exit(0);
+*/
+
   for(auto& p: plates){
-    p.convect(heatmap, segments);
-    p.grow(heatmap, segments);
-    p.collide(c, segments);
+    p.convect(heatmap);
+    p.grow(heatmap);
+    p.collide(c, centroids, segments);
   }
 
   inst->updateBuffer(centroids, 0);
@@ -443,13 +506,13 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
       d = glm::vec3(i+1, 0.0, j+1);
 
       if( aind < w->segments.size() )
-        a = glm::vec3(i  , 10.0*w->segments[aind].height, j  );
+        a = glm::vec3(i  , 10.0*w->segments[aind]->height, j  );
       if( bind < w->segments.size() )
-        b = glm::vec3(i  , 10.0*w->segments[bind].height, j+1);
+        b = glm::vec3(i  , 10.0*w->segments[bind]->height, j+1);
       if( cind < w->segments.size() )
-        c = glm::vec3(i+1, 10.0*w->segments[cind].height, j  );
+        c = glm::vec3(i+1, 10.0*w->segments[cind]->height, j  );
       if( dind < w->segments.size() )
-        d = glm::vec3(i+1, 10.0*w->segments[dind].height, j+1);
+        d = glm::vec3(i+1, 10.0*w->segments[dind]->height, j+1);
 
       glm::vec3 stonecolor = glm::vec3(0.8);
       glm::vec3 collidecolor = glm::vec3(0.0,1.0,0.0);
@@ -475,7 +538,7 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
       m->positions.push_back(c.z);
 
       if(aind < w->segments.size()){
-        if(w->segments[aind].colliding){
+        if(w->segments[aind]->colliding){
           m->colors.push_back(collidecolor.x);
           m->colors.push_back(collidecolor.y);
           m->colors.push_back(collidecolor.z);
@@ -495,7 +558,7 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
       }
 
       if(bind < w->segments.size()){
-        if(w->segments[bind].colliding){
+        if(w->segments[bind]->colliding){
           m->colors.push_back(collidecolor.x);
           m->colors.push_back(collidecolor.y);
           m->colors.push_back(collidecolor.z);
@@ -514,7 +577,7 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
       }
 
       if(cind < w->segments.size()){
-        if(w->segments[cind].colliding){
+        if(w->segments[cind]->colliding){
           m->colors.push_back(collidecolor.x);
           m->colors.push_back(collidecolor.y);
           m->colors.push_back(collidecolor.z);
@@ -555,7 +618,7 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
       m->positions.push_back(b.z);
 
       if(dind < w->segments.size()){
-        if(w->segments[dind].colliding){
+        if(w->segments[dind]->colliding){
           m->colors.push_back(collidecolor.x);
           m->colors.push_back(collidecolor.y);
           m->colors.push_back(collidecolor.z);
@@ -575,7 +638,7 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
       }
 
       if(cind < w->segments.size()){
-        if(w->segments[cind].colliding){
+        if(w->segments[cind]->colliding){
           m->colors.push_back(collidecolor.x);
           m->colors.push_back(collidecolor.y);
           m->colors.push_back(collidecolor.z);
@@ -595,7 +658,7 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
       }
 
       if(bind < w->segments.size()){
-        if(w->segments[bind].colliding){
+        if(w->segments[bind]->colliding){
           m->colors.push_back(collidecolor.x);
           m->colors.push_back(collidecolor.y);
           m->colors.push_back(collidecolor.z);
