@@ -66,6 +66,7 @@ public:
   float thickness = 0.0f;
   float height = 0.0f;
   glm::vec2* pos;
+  bool colliding = false;
 
   void buoyancy(){
     height = thickness*(1-density);
@@ -198,6 +199,108 @@ struct Plate {
     }
   }
 
+  void collide(int* c, std::vector<Litho>& s){
+
+    /*
+        Iterate over the segments in your guy, identify ones which have
+        an alpha value of over two meaning they overlap with the area of another guy
+
+        Inside a collision radius R/2, we check for other segments by scanning the image.
+        Then we can use that to collide.
+
+        Inside a segment, you can't collide with yourself! No need to track.
+    */
+
+
+    for(auto& i: segments){
+
+      glm::vec2 scan;
+
+      s[i].colliding = false;
+
+      int n = 8;
+      for(int j = 0; j < n; j++){
+
+        scan = *s[i].pos;
+        scan += 256.0f*R/10.0f*glm::vec2(cos((float)j/(float)n*2.0f*PI), sin((float)j/(float)n*2.0f*PI));
+
+        if( scan.x >= SIZE || scan.x < 0 ||
+            scan.y >= SIZE || scan.y < 0) continue;
+
+        //std::cout<<i<<": "<<s[i].pos->x<<" "<<s[i].pos->y<<std::endl;
+
+        //Scan Position on Map
+        int mapind = (int)scan.y*SIZE+(int)scan.x; //This is flipped for some reason in the texture
+
+        glm::vec4 col = color::i2rgba(c[mapind]);
+        int segind = col.x + col.y*256 + col.z*256*256;
+
+        //Collision between segment i and sind (for visualization)
+        if(segind == i) continue;
+
+        s[i].colliding = true;
+
+        if(s[i].density > s[segind].density){
+          s[i].thickness -= 0.05*s[i].thickness;
+
+          //Now: Remove elements from the vector!
+
+          if(s[i].thickness < 0.0001);
+          //Delete the centroid and simultaneously
+            //Remove guy
+        }
+        else{
+          s[segind].thickness -= 0.05*s[segind].thickness;
+        }
+
+      //  if(s[i].thickness < )
+
+
+
+      }
+
+
+
+
+      //std::cout<<sind<<std::endl;
+
+    }
+
+
+/*
+    //Iterate over all segments and test for intruders randomly
+    for(auto& i: segments){
+
+      glm::vec2 scan;
+
+    //  std::cout<<i<<": "<<s[i].pos->x<<" "<<s[i].pos->y<<std::endl;
+
+      for(int j = 0; j < 5; j++){
+        //Get the values at those positions
+
+        //Scan in a pentagon?
+        scan = glm::vec2(0);//R/2.0f*glm::vec2(cos(2.0f*PI/(float)(j+1)),sin(2.0f*PI/(float)(j+1)));
+        scan += *s[i].pos;
+
+        if( scan.x >= SIZE || scan.x < 0 ||
+            scan.y >= SIZE || scan.y < 0) continue;
+
+        glm::vec4 col = color::i2rgba(c[0]);
+        int ind = col.x + col.y*256 + col.z*256*256;
+
+      //  std::cout<<ind<<" "<<i<<std::endl;
+      //  if(ind == i) std::cout<<"Same"<<std::endl;
+    //    else std::cout<<"Collision"<<std::endl;
+        //Mass Transfer with this lad
+
+
+      }
+
+    }
+    */
+
+  }
+
 };
 
 //Prepare Noise for jiggling the centroids
@@ -219,6 +322,7 @@ public:
     initialize();
 
     clustering = new Billboard(SIZE, SIZE);
+    depthmap = new Billboard(SIZE, SIZE);
 
   }
 
@@ -242,6 +346,7 @@ public:
   const int nplates = 12;
 
   Billboard* clustering;
+  Billboard* depthmap;
   void initialize();
   void drift(Instance* inst);
   void cluster(Shader* voronoi, Instance* inst);
@@ -310,15 +415,24 @@ void World::cluster(Shader* voronoi, Instance* inst){
   clustering->target(glm::vec3(1));
   voronoi->use();
   voronoi->uniform("R", R);
+  voronoi->uniform("depthmap", false);
+  inst->render();
+  depthmap->target(glm::vec3(1));
+  voronoi->use();
+  voronoi->uniform("R", R);
+  voronoi->uniform("depthmap", true);
   inst->render();
 
 }
 
 void World::drift(Instance* inst){
 
+  int* c =clustering->sample<int>(glm::vec2(0), dim, GL_COLOR_ATTACHMENT0, GL_RGBA);
+
   for(auto& p: plates){
     p.convect(heatmap, segments);
     p.grow(heatmap, segments);
+    p.collide(c, segments);
   }
 
   inst->updateBuffer(centroids, 0);
@@ -372,6 +486,7 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
         d = glm::vec3(i+1, 10.0*w->segments[dind].height, j+1);
 
       glm::vec3 stonecolor = glm::vec3(0.8);
+      glm::vec3 collidecolor = glm::vec3(0.0,1.0,0.0);
       glm::vec3 magmacolor = glm::vec3(0.84,0.17,0.05);
 
       //UPPER TRIANGLE
@@ -394,9 +509,16 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
       m->positions.push_back(c.z);
 
       if(aind < w->segments.size()){
-        m->colors.push_back(stonecolor.x);
-        m->colors.push_back(stonecolor.y);
-        m->colors.push_back(stonecolor.z);
+        if(w->segments[aind].colliding){
+          m->colors.push_back(collidecolor.x);
+          m->colors.push_back(collidecolor.y);
+          m->colors.push_back(collidecolor.z);
+        }
+        else{
+          m->colors.push_back(stonecolor.x);
+          m->colors.push_back(stonecolor.y);
+          m->colors.push_back(stonecolor.z);
+        }
         m->colors.push_back(1.0);
       }
       else{
@@ -407,10 +529,16 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
       }
 
       if(bind < w->segments.size()){
-        m->colors.push_back(stonecolor.x);
-        m->colors.push_back(stonecolor.y);
-        m->colors.push_back(stonecolor.z);
-        m->colors.push_back(1.0);
+        if(w->segments[bind].colliding){
+          m->colors.push_back(collidecolor.x);
+          m->colors.push_back(collidecolor.y);
+          m->colors.push_back(collidecolor.z);
+        }
+        else{
+          m->colors.push_back(stonecolor.x);
+          m->colors.push_back(stonecolor.y);
+          m->colors.push_back(stonecolor.z);
+        }        m->colors.push_back(1.0);
       }
       else{
         m->colors.push_back(magmacolor.x);
@@ -420,10 +548,16 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
       }
 
       if(cind < w->segments.size()){
-        m->colors.push_back(stonecolor.x);
-        m->colors.push_back(stonecolor.y);
-        m->colors.push_back(stonecolor.z);
-        m->colors.push_back(1.0);
+        if(w->segments[cind].colliding){
+          m->colors.push_back(collidecolor.x);
+          m->colors.push_back(collidecolor.y);
+          m->colors.push_back(collidecolor.z);
+        }
+        else{
+          m->colors.push_back(stonecolor.x);
+          m->colors.push_back(stonecolor.y);
+          m->colors.push_back(stonecolor.z);
+        }        m->colors.push_back(1.0);
       }
       else{
         m->colors.push_back(magmacolor.x);
@@ -455,9 +589,16 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
       m->positions.push_back(b.z);
 
       if(dind < w->segments.size()){
-        m->colors.push_back(stonecolor.x);
-        m->colors.push_back(stonecolor.y);
-        m->colors.push_back(stonecolor.z);
+        if(w->segments[dind].colliding){
+          m->colors.push_back(collidecolor.x);
+          m->colors.push_back(collidecolor.y);
+          m->colors.push_back(collidecolor.z);
+        }
+        else{
+          m->colors.push_back(stonecolor.x);
+          m->colors.push_back(stonecolor.y);
+          m->colors.push_back(stonecolor.z);
+        }
         m->colors.push_back(1.0);
       }
       else{
@@ -468,9 +609,16 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
       }
 
       if(cind < w->segments.size()){
-        m->colors.push_back(stonecolor.x);
-        m->colors.push_back(stonecolor.y);
-        m->colors.push_back(stonecolor.z);
+        if(w->segments[cind].colliding){
+          m->colors.push_back(collidecolor.x);
+          m->colors.push_back(collidecolor.y);
+          m->colors.push_back(collidecolor.z);
+        }
+        else{
+          m->colors.push_back(stonecolor.x);
+          m->colors.push_back(stonecolor.y);
+          m->colors.push_back(stonecolor.z);
+        }
         m->colors.push_back(1.0);
       }
       else{
@@ -481,9 +629,16 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
       }
 
       if(bind < w->segments.size()){
-        m->colors.push_back(stonecolor.x);
-        m->colors.push_back(stonecolor.y);
-        m->colors.push_back(stonecolor.z);
+        if(w->segments[bind].colliding){
+          m->colors.push_back(collidecolor.x);
+          m->colors.push_back(collidecolor.y);
+          m->colors.push_back(collidecolor.z);
+        }
+        else{
+          m->colors.push_back(stonecolor.x);
+          m->colors.push_back(stonecolor.y);
+          m->colors.push_back(stonecolor.z);
+        }
         m->colors.push_back(1.0);
       }
       else{

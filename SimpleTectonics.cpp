@@ -30,7 +30,6 @@ int main( int argc, char* args[] ) {
 	Shader billboardshader({"source/shader/billboard.vs", "source/shader/billboard.fs"}, {"in_Quad", "in_Tex"});
 	Shader shader({"source/shader/default.vs", "source/shader/default.fs"}, {"in_Position", "in_Normal", "in_Color"});
 	Shader depth({"source/shader/depth.vs", "source/shader/depth.fs"}, {"in_Position"});
-  Shader effect({"source/shader/effect.vs", "source/shader/effect.fs"}, {"in_Quad", "in_Tex"});
 
 	//Utility Classes
 	Square2D flat;
@@ -101,6 +100,9 @@ int main( int argc, char* args[] ) {
 			billboardshader.uniform("model", flat.model);
 			flat.render();
 
+			//billboardshader.texture("imageTexture", world.depthmap->texture);
+			//flat.move(glm::vec3(-1.0+0.25/WIDTH*HEIGHT,1.0-0.25,0.0), 0, glm::vec3(1.0f*0.25/WIDTH*HEIGHT,0.25,0.0));
+
 		}
 
 	};
@@ -108,8 +110,8 @@ int main( int argc, char* args[] ) {
 	Tiny::loop([&](){ //Execute every frame
 
 		if(animate){
-			world.drift(&instance);
 			world.cluster(&voronoi, &instance);
+			world.drift(&instance);
 			model.construct(tectonicmesh, &world); //Reconstruct Updated Model
 		}
 
