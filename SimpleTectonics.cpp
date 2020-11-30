@@ -91,17 +91,17 @@ int main( int argc, char* args[] ) {
 
 		if(viewmap){
 
-			//Render Clustering to Screen
-	//		Tiny::view.target(glm::vec3(1));
 			billboardshader.use();
+
 			billboardshader.texture("imageTexture", world.clustering->texture);
-			//billboardshader.texture("imageTexture", map.texture);
 			flat.move(glm::vec3(-1.0+0.25/WIDTH*HEIGHT,1.0-0.25,0.0), 0, glm::vec3(1.0f*0.25/WIDTH*HEIGHT,0.25,0.0));
 			billboardshader.uniform("model", flat.model);
 			flat.render();
 
-			//billboardshader.texture("imageTexture", world.depthmap->texture);
-			//flat.move(glm::vec3(-1.0+0.25/WIDTH*HEIGHT,1.0-0.25,0.0), 0, glm::vec3(1.0f*0.25/WIDTH*HEIGHT,0.25,0.0));
+			billboardshader.texture("imageTexture", map.texture);
+			flat.move(glm::vec3(-1.0+0.75/WIDTH*HEIGHT,1.0-0.25,0.0), 0, glm::vec3(1.0f*0.25/WIDTH*HEIGHT,0.25,0.0));
+			billboardshader.uniform("model", flat.model);
+			flat.render();
 
 		}
 

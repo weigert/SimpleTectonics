@@ -109,7 +109,7 @@ struct Plate {
       glm::vec2 dir = *(seg[i]->pos)-pos;
 
       acc += convection*f;
-      torque += convection*length(dir)*length(f)*sin(angle(f)-angle(dir));
+      torque += 5*convection*length(dir)*length(f)*sin(angle(f)-angle(dir));
 
     }
 

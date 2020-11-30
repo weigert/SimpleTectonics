@@ -28,7 +28,8 @@ glm::vec3 viewPos = glm::vec3(SIZE/2.0, 40.0, SIZE/2.0);
 
 //Lighting and Shading
 //glm::vec3 skyCol = glm::vec4(0.53, 0.22, 0.22, 1.0f);
-glm::vec3 skyCol = glm::vec4(0.92, 0.82, 0.64, 1.0f);
+//glm::vec3 skyCol = glm::vec4(0.92, 0.82, 0.64, 1.0f);
+glm::vec3 skyCol = glm::vec4(0.17, 0.11, 0.18, 1.0f);
 
 
 glm::vec3 lightPos = glm::vec3(-100.0f, 100.0f, -150.0f);
