@@ -105,15 +105,52 @@ int main( int argc, char* args[] ) {
 
 		}
 
+
 	};
+
+	int m = 0;
 
 	Tiny::loop([&](){ //Execute every frame
 
+
 		if(animate){
-			world.cluster(&voronoi, &instance);
+
 			world.drift(&instance);
+			world.cluster(&voronoi, &instance);
 			model.construct(tectonicmesh, &world); //Reconstruct Updated Model
+
+			m++;
+			if(m%100 == 0){
+				std::cout<<"node added"<<std::endl;
+				world.centroids.push_back(glm::vec2(rand()%SIZE,rand()%SIZE));
+				Litho* newseg = new Litho(0.5f, 0.0f, &world.centroids[world.centroids.size()-1], world.segments.size()); //Properly Scaled Position
+				world.segments.push_back(newseg);
+
+				float dist = SIZE*SIZE;
+				Plate* nearest;
+
+				for(auto&p: world.plates){
+
+					if( glm::length(p.pos-*newseg->pos) < dist ){
+						dist = glm::length(p.pos-*newseg->pos);
+						nearest = &p;
+					}
+
+				}
+
+				nearest->seg.push_back(newseg);
+
+				//Important: Fix centroid references!
+				for(int i = 0; i < world.segments.size(); i++){
+					world.segments[i]->pos = &world.centroids[i]; //Update position as well
+				}
+
+				nearest->recenter();
+
+			}
+
 		}
+
 
 	});
 

@@ -58,3 +58,50 @@ Points move around randomly and squish and squash.
 
 The question is: what happens when they collide?
 Can centroids have a height value which means they have stronger influence?
+
+/*
+    Plates track their Centroids
+
+    //Plate Movement
+    Based on a heat map, we can compute centroid convection
+    Convection is proportional to the gradient obvisously.
+    The heat map is initialized with noise.
+    The centroid convections are used to compute the force and torque of the plate
+    we can compute the plate center, direction and rotation
+    we can then move the centroids
+
+    //Centroid Height
+    Centroids have a thickness and a density.
+    Age of a segment dictates its thickness, which grows at a certain rate,
+    while the heat dictates an equilibrium density which is the density the plate grows at.
+    The centroid thereby stores a certain amount of mass over its area.
+
+    Additionally, the centroid's 3D position is determined by its density and volume.
+    It is basically floating, and there is a certain amount above and below the surface.
+    Density is initially 0.5, so that it floats half above.
+
+    //Plate Collision
+    When plates collide, the less dense plate is pushed below and the more dense plate is pushed above.
+    This creates sediment and heat. How much sediment and how much heat? Basically we take the combined
+    height and density, compute the overshoot on the top and bottom to compute sedimentation and heating rate.
+
+    When plates separate, new plate is created which has the density given by the heat below.
+    That is all.
+
+    //Heat Generation
+    Heat can initially be seeded with random noise and we can see how plates move.
+    Later heat can be generated randomly or can be affected by the centroid growth.
+    When centroids collide, they generate heat by destruction of mass.
+
+    The area of the less dense plate is destroyed proportionally to its submerged density
+
+    //Sediment Transport and Heat Generation
+    Computing where and how plates move relative to each other,
+    we can compute where to generate heat.
+
+    NOTE:
+    As a plate with a high density, i.e. sitting at a ratio other than 1:1 in the ground,
+    then as the thickness decreases due to collision, the plate will sink further down faster.
+    The thickness of the plate needs to decrease as it subduces.
+
+*/
