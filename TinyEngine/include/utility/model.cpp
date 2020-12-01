@@ -75,7 +75,9 @@ void Primitive::attrib<GLfloat>(int index, int size){
 
 struct Square2D: Primitive{
   GLfloat vert[8] = {-1.0,  1.0, -1.0, -1.0,  1.0,  1.0,  1.0, -1.0};
-  GLfloat tex [8] = { 1.0,  0.0,  1.0,  1.0,  0.0,  0.0,  0.0,  1.0};
+  GLfloat tex [8] = { 0.0,  1.0,  0.0,  0.0,  1.0,  1.0,  1.0,  0.0};
+  //GLfloat vert[8] = {  1.0, -1.0,  1.0,  1.0, -1.0, -1.0, -1.0,  1.0 };
+  //GLfloat tex [8] = {  1.0,  0.0,  1.0,  1.0,  0.0,  0.0,  0.0,  1.0 };
 
   Square2D():Primitive(){
     bind(0, 8, 2, &vert[0]);

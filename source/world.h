@@ -34,6 +34,7 @@ public:
   float thickness = 0.0f;
   float height = 0.0f;
   bool colliding = false;
+  int collider = 0;
 
   vec2 force(double* hm){
 
@@ -41,8 +42,8 @@ public:
     float fx, fy = 0.0f;
 
     if(i.x > 0 && i.x < SIZE-1 && i.y > 0 && i.y < SIZE-1){
-      fx = (hm[(i.x+1)*SIZE+i.y] - hm[(i.x-1)*SIZE+i.y])/2.0f;
-      fy = (hm[i.x*SIZE+i.y+1] - hm[i.x*SIZE+i.y-1])/2.0f;
+      fx = -(hm[(i.x+1)*SIZE+i.y] - hm[(i.x-1)*SIZE+i.y])/2.0f;
+      fy = -(hm[i.x*SIZE+i.y+1] - hm[i.x*SIZE+i.y-1])/2.0f;
     }
 
     if(i.x <= 0) fx = 0.1f;
@@ -97,7 +98,7 @@ struct Plate {
 
   }
 
-  void convect(double* hm){
+  void convect(double* hm, vector<Litho*>& segments){
 
     glm::vec2 acc = glm::vec2(0);
     float torque = 0.0f;
@@ -184,7 +185,7 @@ struct Plate {
       glm::vec4 col = color::i2rgba(c[cmind]);
       int csind = (int)col.x + (int)col.y*256 + (int)col.z*256*256;
 
-      const int n = 8;
+      const int n = 12;
       for(int j = 0; j < n; j++){
 
         //Reset and Shift
@@ -198,6 +199,9 @@ struct Plate {
         //Get Scan Index
         int mapind = (int)scan.y*SIZE+(int)scan.x;
         col = color::i2rgba(c[mapind]);
+
+        if(col.z == 255) continue;
+
         int segind = (int)col.x + (int)col.y*256 + (int)col.z*256*256;
 
         //Plate is not colliding
@@ -205,11 +209,10 @@ struct Plate {
       //  if(segs[segind]->colliding) continue;
 
         //Plate has lower density
-      //  if(s->density <= segs[segind]->density) continue;
+        //if(s->density <= segs[segind]->density) continue;
 
         s->colliding = true;
-
-        //Plate has higher density and is therefore subducted
+        s->collider = segind;
 
         seg.erase(seg.begin()+i);
         i--;
@@ -241,7 +244,7 @@ public:
 
     std::cout<<"SEED: "<<SEED<<std::endl;
 
-    perlin.SetOctaveCount(4);
+    perlin.SetOctaveCount(8);
     perlin.SetFrequency(1.0);
     perlin.SetPersistence(0.5);
 
@@ -254,9 +257,15 @@ public:
 
   ~World(){
     delete clustering;
+    delete depthmap;
+    delete heatA;
+    delete heatB;
 
     for(int i = 0; i < segments.size(); i++)
       delete segments[i];
+
+    delete[] clustermap;
+    delete[] heatmap;
   }
 
   //General Information
@@ -265,7 +274,8 @@ public:
   const glm::vec2 dim = glm::vec2(SIZE, SIZE);
   noise::module::Perlin perlin;
 
-  double heatmap[SIZE*SIZE]; //Raw Pointer Array (lmao)
+  double* heatmap;
+  int* clustermap;
 
   //Plate Centroids
   vector<vec2> centroids;  //Raw Position Buffer
@@ -276,15 +286,23 @@ public:
 
   Billboard* clustering;
   Billboard* depthmap;
+  Billboard* heatA;
+  Billboard* heatB;
+
   void initialize();
-  void drift(Instance* inst);
+  void drift();
   void cluster(Shader* voronoi, Instance* inst);
+  void diffuse(Shader* diffusion, Shader* subduction, Square2D* flat);
+  void update(Instance* inst);
 
   void addNode(glm::vec2 pos);
   void delNode(int ind);
 };
 
 void World::initialize(){
+
+  heatmap = new double[SIZE*SIZE];
+  clustermap = new int[SIZE*SIZE];
 
   //Generate Randomized Heat Map
   float min = 1.0;
@@ -301,6 +319,14 @@ void World::initialize(){
   for(unsigned int i = 0; i < SIZE; i++)
     for(unsigned int j = 0; j < SIZE; j++)
       heatmap[j+i*SIZE] = (heatmap[j+i*SIZE] - min)/(max-min);
+
+  //Construct a billboard, using a texture generated from the raw data
+  heatA = new Billboard(image::make<double>(vec2(SIZE, SIZE), heatmap, [](double t){
+    return mix(vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 0.0, 0.0, 1.0), t);
+  }));
+  heatB = new Billboard(image::make<double>(vec2(SIZE, SIZE), heatmap, [](double t){
+    return mix(vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 0.0, 0.0, 1.0), t);
+  }));
 
   //Generate Plates
   for(int i = 0; i < nplates; i++)
@@ -343,13 +369,29 @@ void World::cluster(Shader* voronoi, Instance* inst){
   voronoi->uniform("depthmap", false);
   inst->render();
 
-/*
-  depthmap->target(glm::vec3(1));
-  voronoi->use();
-  voronoi->uniform("R", R);
-  voronoi->uniform("depthmap", true);
-  inst->render();
-*/
+}
+
+void World::diffuse(Shader* diffusion, Shader* subduction, Square2D* flat){
+
+  heatB->target(false); //No-Clear Target
+  diffusion->use();
+  diffusion->texture("map", heatA->texture);
+  flat->render();
+
+  std::vector<int> colliding;
+
+  for(int i = 0; i < segments.size(); i++){
+    if(segments[i]->colliding) colliding.push_back(1);
+    else colliding.push_back(0);
+  }
+
+  heatA->target(false); //No-Clear Target
+  subduction->buffer("colliding", colliding);
+  subduction->use();
+  subduction->texture("map", heatB->texture);
+  subduction->texture("cluster", clustering->texture);
+  flat->render();
+
 }
 
 void World::addNode(glm::vec2 pos){
@@ -389,53 +431,55 @@ void World::delNode(int ind){
 
 }
 
-void World::drift(Instance* inst){
-
-  int* c = clustering->sample<int>(glm::vec2(0), dim, GL_COLOR_ATTACHMENT0, GL_RGBA);
+void World::drift(){
 
   for(auto& p: plates){
-    p.convect(heatmap);
+    p.convect(heatmap, segments);
     p.grow(heatmap);
-    p.collide(c, centroids, segments);
+    p.collide(clustermap, centroids, segments);
   }
 
-  //Remove Colliding Guys?
-  for(int i = 0; i < segments.size(); i++){
-    if(segments[i]->colliding){
-  //    segments[i]->thickness -= 0.1*segments[i]->thickness;
-  //    if(segments[i]->thickness < 0.01){
-        delNode(i);
-        i--;
-  //    }
-    }
-  }
+}
 
-  /*
-  Note: At least make it grow at the proper density...
-  */
+void World::update(Instance* inst){
 
-  for(auto&p: plates){
-    for(auto&s: p.seg){
 
-      float angle = (float)(rand()%100)/100.0f*2.0f*PI;
-      vec2 scan = *(s->pos);
-      scan += 256.0f*R/2.0f*vec2(cos(angle), sin(angle));
+    //Here I should do the collision run.
+    //I kind of need a way to tell which ones are colliding.
 
-      //Compute Color at Scan
-      //Index of the current guy in general
-      int cmind = (int)scan.y*SIZE+(int)scan.x;
-      vec4 col = color::i2rgba(c[cmind]);
-
-      if(col == vec4(255)){
-        addNode(scan);
-        break;
+    //Remove Colliding Guys?
+    for(int i = 0; i < segments.size(); i++){
+      if(segments[i]->colliding){
+          delNode(i);
+          i--;
       }
-
     }
-  }
 
-  inst->updateBuffer(centroids, 0);
-  delete[] c;
+    /*
+    Note: At least make it grow at the proper density...
+    */
+
+    for(auto&p: plates){
+      for(auto&s: p.seg){
+
+        float angle = (float)(rand()%100)/100.0f*2.0f*PI;
+        vec2 scan = *(s->pos);
+        scan += 256.0f*R/2.0f*vec2(cos(angle), sin(angle));
+
+        //Compute Color at Scan
+        //Index of the current guy in general
+        int cmind = (int)scan.y*SIZE+(int)scan.x;
+        vec4 col = color::i2rgba(clustermap[cmind]);
+
+        if(col == vec4(255)){
+          addNode(scan);
+          break;
+        }
+
+      }
+    }
+
+    inst->updateBuffer(centroids, 0);
 
 }
 
@@ -447,12 +491,13 @@ void World::drift(Instance* inst){
 
 std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
 
+  delete[] w->clustermap;
+  w->clustermap = w->clustering->sample<int>(glm::vec2(0), w->dim, GL_COLOR_ATTACHMENT0, GL_RGBA);
+
   m->indices.clear();
   m->positions.clear();
   m->normals.clear();
   m->colors.clear();
-
-  int* inds = w->clustering->sample<int>(glm::vec2(0), w->dim, GL_COLOR_ATTACHMENT0, GL_RGBA);
 
   //Loop over all positions and add the triangles!
   for(int i = 0; i < w->dim.x-1; i++){
@@ -461,13 +506,13 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
       //Get Index
       int ind = i*w->dim.y+j;
 
-      glm::vec4 col = color::i2rgba(inds[(int)(i*w->dim.y+j)]);
+      glm::vec4 col = color::i2rgba(w->clustermap[(int)(i*w->dim.y+j)]);
       int aind = col.x + col.y*256 + col.z*256*256;
-      col = color::i2rgba(inds[(int)(i*w->dim.y+j+1)]);
+      col = color::i2rgba(w->clustermap[(int)(i*w->dim.y+j+1)]);
       int bind = col.x + col.y*256 + col.z*256*256;
-      col = color::i2rgba(inds[(int)((i+1)*w->dim.y+j)]);
+      col = color::i2rgba(w->clustermap[(int)((i+1)*w->dim.y+j)]);
       int cind = col.x + col.y*256 + col.z*256*256;
-      col = color::i2rgba(inds[(int)((i+1)*w->dim.y+j+1)]);
+      col = color::i2rgba(w->clustermap[(int)((i+1)*w->dim.y+j+1)]);
       int dind = col.x + col.y*256 + col.z*256*256;
 
       //Add to Position Vector
@@ -627,9 +672,4 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
     }
   }
 
-  delete[] inds;
-};
-
-std::function<glm::vec4(double)> heatmap = [](double hm){
-  return glm::mix(glm::vec4(0.0,0.0,0.0,1.0), glm::vec4(1.0), hm);
 };

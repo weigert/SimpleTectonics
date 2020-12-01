@@ -30,13 +30,13 @@ int main( int argc, char* args[] ) {
 	Shader billboardshader({"source/shader/billboard.vs", "source/shader/billboard.fs"}, {"in_Quad", "in_Tex"});
 	Shader shader({"source/shader/default.vs", "source/shader/default.fs"}, {"in_Position", "in_Normal", "in_Color"});
 	Shader depth({"source/shader/depth.vs", "source/shader/depth.fs"}, {"in_Position"});
+	Shader diffusion({"source/shader/diffusion.vs", "source/shader/diffusion.fs"}, {"in_Quad", "in_Tex"});
+	Shader subduction({"source/shader/subduction.vs", "source/shader/subduction.fs"}, {"in_Quad", "in_Tex"}, {"colliding"});
 
 	//Utility Classes
 	Square2D flat;
 	Model model(tectonicmesh, &world);
-
-	Billboard shadow(2000, 2000, true);
-	Billboard image(WIDTH, HEIGHT, false); //1200x800, depth only
+	Billboard shadow(2000, 2000, true);			//Shadow Map
 
 	//Prepare instance render of flat, per-centroid
 	Instance instance(&flat);
@@ -47,9 +47,6 @@ int main( int argc, char* args[] ) {
 
 	world.cluster(&voronoi, &instance);
 	model.construct(tectonicmesh, &world); //Reconstruct Updated Model
-
-	//Setup 2D Images
-  Billboard map(image::make<double>(world.dim, world.heatmap, heatmap));
 
 	Tiny::view.pipeline = [&](){
 
@@ -65,8 +62,8 @@ int main( int argc, char* args[] ) {
 		model.render(GL_TRIANGLES);       //Render Model
 
 		//Regular Image
-    //image.target(skyCol);           //Prepare Target
 		Tiny::view.target(skyCol);
+
 		shader.use();                   //Prepare Shader
 		shader.texture("shadowMap", shadow.depth);
     shader.uniform("lightCol", lightCol);
@@ -78,27 +75,16 @@ int main( int argc, char* args[] ) {
     shader.uniform("model", model.model);
     model.render(GL_TRIANGLES);    //Render Model
 
-/*
-    //Render to Screen
-    Tiny::view.target(color::black);    //Prepare Target
-    effect.use();                //Prepare Shader
-		effect.texture("imageTexture", image.texture);
-		effect.texture("depthTexture", image.depth);
-		effect.uniform("model", flat.model);
-		flat.render();
-    //image.render();                     //Render Image
-*/
-
 		if(viewmap){
 
 			billboardshader.use();
-
 			billboardshader.texture("imageTexture", world.clustering->texture);
 			flat.move(glm::vec3(-1.0+0.25/WIDTH*HEIGHT,1.0-0.25,0.0), 0, glm::vec3(1.0f*0.25/WIDTH*HEIGHT,0.25,0.0));
 			billboardshader.uniform("model", flat.model);
 			flat.render();
 
-			billboardshader.texture("imageTexture", map.texture);
+			billboardshader.use();
+			billboardshader.texture("imageTexture", world.heatA->texture);
 			flat.move(glm::vec3(-1.0+0.75/WIDTH*HEIGHT,1.0-0.25,0.0), 0, glm::vec3(1.0f*0.25/WIDTH*HEIGHT,0.25,0.0));
 			billboardshader.uniform("model", flat.model);
 			flat.render();
@@ -113,9 +99,14 @@ int main( int argc, char* args[] ) {
 	Tiny::loop([&](){ //Execute every frame
 
 
+
 		if(animate){
 
-			world.drift(&instance);
+			world.drift();
+			for(int i = 0; i < 50; i++)
+				world.diffuse(&diffusion, &subduction, &flat);
+
+			world.update(&instance);
 			world.cluster(&voronoi, &instance);
 			model.construct(tectonicmesh, &world); //Reconstruct Updated Model
 

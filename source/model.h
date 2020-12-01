@@ -18,10 +18,11 @@ float zoom = 0.2;
 float zoomInc = 0.005;
 
 //Rotation and View
-float rotation = 0.0f;
+float rotation = 180.0f;
 glm::vec3 cameraPos = glm::vec3(50, 50, 50);
 glm::vec3 lookPos = glm::vec3(0, 0, 0);
-glm::mat4 camera = glm::lookAt(cameraPos, lookPos, glm::vec3(0,1,0));
+glm::mat4 camera = glm::rotate(glm::lookAt(cameraPos, lookPos, glm::vec3(0,1,0)), glm::radians(rotation), glm::vec3(0.0f, 1.0f, 0.0f));
+
 glm::mat4 projection = glm::ortho(-(float)WIDTH*zoom, (float)WIDTH*zoom, -(float)HEIGHT*zoom, (float)HEIGHT*zoom, -800.0f, 500.0f);
 
 glm::vec3 viewPos = glm::vec3(SIZE/2.0, 40.0, SIZE/2.0);
