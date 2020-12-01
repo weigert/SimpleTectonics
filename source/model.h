@@ -2,7 +2,7 @@
 bool animate = false;
 bool viewmap = false;
 
-float K = 2048;
+float K = 4096;
 float R = 2.0f*sqrt(4.0f/3.14159265f/K);
 
 #define SIZE 256
@@ -27,8 +27,6 @@ glm::mat4 projection = glm::ortho(-(float)WIDTH*zoom, (float)WIDTH*zoom, -(float
 glm::vec3 viewPos = glm::vec3(SIZE/2.0, 40.0, SIZE/2.0);
 
 //Lighting and Shading
-//glm::vec3 skyCol = glm::vec4(0.53, 0.22, 0.22, 1.0f);
-//glm::vec3 skyCol = glm::vec4(0.92, 0.82, 0.64, 1.0f);
 glm::vec3 skyCol = glm::vec4(0.17, 0.11, 0.18, 1.0f);
 
 
