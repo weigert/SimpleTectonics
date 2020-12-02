@@ -34,7 +34,7 @@ public:
   float thickness = 0.0f;
   float height = 0.0f;
   bool colliding = false;
-  int collider = 0;
+  int collider = -1;
 
   vec2 force(double* hm){
 
@@ -107,6 +107,20 @@ struct Plate {
     for(int i = 0 ; i < seg.size(); i++){
 
       glm::vec2 f = seg[i]->force(hm);
+
+      //Collision Force
+      if(seg[i]->colliding){
+
+        //Collision Force Direction
+        vec2 cf = *seg[i]->pos - *segments[seg[i]->collider]->pos;
+        if(length(*seg[i]->pos - pos) > length(*segments[seg[i]->collider]->pos - pos))
+          cf *= -1.0f;
+
+        if(length(cf) != 0)
+          f += 2.5f*normalize(cf);
+
+      }
+
       glm::vec2 dir = *(seg[i]->pos)-pos;
 
       acc += convection*f;
@@ -162,8 +176,10 @@ struct Plate {
         s->thickness += G;
 
       }
-
-      else s->colliding = true;
+      else if(ip.x < -SIZE || ip.x > 2*SIZE-1 ||
+      ip.y < -SIZE || ip.y > 2*SIZE-1){
+        s->colliding = true;
+      }
 
       //Compute Buoyancy
       s->height = s->thickness*(1-s->density);
@@ -206,17 +222,9 @@ struct Plate {
 
         //Plate is not colliding
         if(segind == csind) continue;
-      //  if(segs[segind]->colliding) continue;
-
-        //Plate has lower density
-        //if(s->density <= segs[segind]->density) continue;
 
         s->colliding = true;
         s->collider = segind;
-
-        seg.erase(seg.begin()+i);
-        i--;
-        recenter();
 
         break;
 
@@ -266,6 +274,7 @@ public:
 
     delete[] clustermap;
     delete[] heatmap;
+    delete[] heightmap;
   }
 
   //General Information
@@ -275,6 +284,7 @@ public:
   noise::module::Perlin perlin;
 
   double* heatmap;
+  double* heightmap;
   int* clustermap;
 
   //Plate Centroids
@@ -288,6 +298,8 @@ public:
   Billboard* depthmap;
   Billboard* heatA;
   Billboard* heatB;
+  Billboard* heightA;
+  Billboard* heightB;
 
   void initialize();
   void drift();
@@ -303,6 +315,7 @@ void World::initialize(){
 
   heatmap = new double[SIZE*SIZE];
   clustermap = new int[SIZE*SIZE];
+  heightmap = new double[SIZE*SIZE];
 
   //Generate Randomized Heat Map
   float min = 1.0;
@@ -319,6 +332,25 @@ void World::initialize(){
   for(unsigned int i = 0; i < SIZE; i++)
     for(unsigned int j = 0; j < SIZE; j++)
       heatmap[j+i*SIZE] = (heatmap[j+i*SIZE] - min)/(max-min);
+
+
+  //Construct Heightmap
+  //Generate Randomized Heat Map
+  min = 1.0;
+  max = -1.0;
+  for(unsigned int i = 0; i < SIZE; i++){
+    for(unsigned int j = 0; j < SIZE; j++){
+      heightmap[j+i*SIZE] = perlin.GetValue((float)i/(float)SIZE, (float)j/(float)SIZE, SEED);
+      if(heightmap[j+i*SIZE] > max) max = heightmap[j+i*SIZE];
+      if(heightmap[j+i*SIZE] < min) min = heightmap[j+i*SIZE];
+    }
+  }
+
+  //Normalize Heatmap
+  for(unsigned int i = 0; i < SIZE; i++)
+    for(unsigned int j = 0; j < SIZE; j++)
+      heightmap[j+i*SIZE] = (heightmap[j+i*SIZE] - min)/(max-min);
+
 
   //Construct a billboard, using a texture generated from the raw data
   heatA = new Billboard(image::make<double>(vec2(SIZE, SIZE), heatmap, [](double t){
@@ -361,6 +393,12 @@ void World::initialize(){
 
 }
 
+/*
+================================================================================
+                            Plate Dynamics
+================================================================================
+*/
+
 void World::cluster(Shader* voronoi, Instance* inst){
 
   clustering->target(glm::vec3(1));
@@ -368,6 +406,16 @@ void World::cluster(Shader* voronoi, Instance* inst){
   voronoi->uniform("R", R);
   voronoi->uniform("depthmap", false);
   inst->render();
+
+}
+
+void World::drift(){
+
+  for(auto& p: plates){
+    p.collide(clustermap, centroids, segments);
+    p.convect(heatmap, segments);
+    p.grow(heatmap);
+  }
 
 }
 
@@ -393,6 +441,12 @@ void World::diffuse(Shader* diffusion, Shader* subduction, Square2D* flat){
   flat->render();
 
 }
+
+/*
+================================================================================
+                            Add / Remove Centroids
+================================================================================
+*/
 
 void World::addNode(glm::vec2 pos){
 
@@ -431,23 +485,42 @@ void World::delNode(int ind){
 
 }
 
-void World::drift(){
-
-  for(auto& p: plates){
-    p.convect(heatmap, segments);
-    p.grow(heatmap);
-    p.collide(clustermap, centroids, segments);
-  }
-
-}
-
 void World::update(Instance* inst){
 
+  //Unreference Colliding Segments
+  for(int i = 0; i < plates.size(); i++){
+    if(plates[i].seg.size() == 0){
+      plates[i].seg.erase(plates[i].seg.begin()+i);
+      i--;
+    }
+  }
 
-    //Here I should do the collision run.
-    //I kind of need a way to tell which ones are colliding.
+  for(auto&p: plates){
+    bool erased = false;
+    for(int i = 0; i < p.seg.size(); i++){
+      if(p.seg[i]->colliding){
+        p.seg.erase(p.seg.begin()+i);
+        i--;
+        erased = true;
+      }
+    }
+    if(erased) p.recenter();
+  }
 
-    //Remove Colliding Guys?
+    //Unreference Colliding Segments
+    for(auto&p: plates){
+      bool erased = false;
+      for(int i = 0; i < p.seg.size(); i++){
+        if(p.seg[i]->colliding){
+          p.seg.erase(p.seg.begin()+i);
+          i--;
+          erased = true;
+        }
+      }
+      if(erased) p.recenter();
+    }
+
+    //Remove Colliding Segments
     for(int i = 0; i < segments.size(); i++){
       if(segments[i]->colliding){
           delNode(i);
@@ -455,10 +528,7 @@ void World::update(Instance* inst){
       }
     }
 
-    /*
-    Note: At least make it grow at the proper density...
-    */
-
+    //Add New Nodes
     for(auto&p: plates){
       for(auto&s: p.seg){
 
@@ -484,9 +554,9 @@ void World::update(Instance* inst){
 }
 
 /*
-==================================================
-    Construct a mesh from the world!
-==================================================
+================================================================================
+                                  Rendering
+================================================================================
 */
 
 std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
@@ -524,13 +594,20 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
       d = glm::vec3(i+1, 0.0, j+1);
 
       if( aind < w->centroids.size() )
-        a = glm::vec3(i  , 10.0*w->segments[aind]->height, j  );
+        a += glm::vec3(0, 10.0*w->segments[aind]->height, 0);
       if( bind < w->centroids.size() )
-        b = glm::vec3(i  , 10.0*w->segments[bind]->height, j+1);
+        b += glm::vec3(0, 10.0*w->segments[bind]->height, 0);
       if( cind < w->centroids.size() )
-        c = glm::vec3(i+1, 10.0*w->segments[cind]->height, j  );
+        c += glm::vec3(0, 10.0*w->segments[cind]->height, 0);
       if( dind < w->centroids.size() )
-        d = glm::vec3(i+1, 10.0*w->segments[dind]->height, j+1);
+        d += glm::vec3(0, 10.0*w->segments[dind]->height, 0);
+
+/*
+      a += glm::vec3(0, 10.0*w->heightmap[i*(int)w->dim.y+j], 0);
+      b += glm::vec3(0, 10.0*w->heightmap[i*(int)w->dim.y+j+1], 0);
+      c += glm::vec3(0, 10.0*w->heightmap[i*(int)w->dim.y+j], 0);
+      d += glm::vec3(0, 10.0*w->heightmap[(i+1)*(int)w->dim.y+j+1], 0);
+*/
 
       glm::vec3 stonecolor = glm::vec3(0.8);
       glm::vec3 collidecolor = glm::vec3(0.7,0.64,0.52);
