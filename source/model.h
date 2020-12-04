@@ -1,8 +1,9 @@
 //GPU Accelerated Voronoi Controller Stuff
 bool animate = false;
 bool viewmap = false;
+bool viewplates = true;
 
-float K = 4096;
+float K = 2048;
 float R = 2.0f*sqrt(4.0f/3.14159265f/K);
 
 #define SIZE 256
@@ -12,7 +13,7 @@ Rendering Stuff
 */
 
 const int WIDTH = 1000;
-const int HEIGHT = 800;
+const int HEIGHT = 1000;
 
 float zoom = 0.2;
 float zoomInc = 0.005;
@@ -29,6 +30,7 @@ glm::vec3 viewPos = glm::vec3(SIZE/2.0, 40.0, SIZE/2.0);
 
 //Lighting and Shading
 glm::vec3 skyCol = glm::vec4(0.17, 0.11, 0.18, 1.0f);
+glm::vec3 skyBlue = glm::vec4(0.7, 0.95, 0.91, 1.0f);
 
 
 glm::vec3 lightPos = glm::vec3(-100.0f, 100.0f, -150.0f);
@@ -107,6 +109,10 @@ std::function<void()> eventHandler = [&](){
 
     if(Tiny::event.press.back() == SDLK_ESCAPE)
       viewmap = !viewmap;
+
+    if(Tiny::event.press.back() == SDLK_RETURN)
+      viewplates = !viewplates;
+
 
   }
 

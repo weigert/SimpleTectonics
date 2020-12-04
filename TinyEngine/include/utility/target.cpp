@@ -46,18 +46,16 @@ public:
   }
 
   template<typename T> //Raw Buffer Sampling
-  T* sample(glm::vec2 p, glm::vec2 d, GLenum ATTACH, GLenum FORMAT){
-    if(d.x <= 0 || d.y <= 0 || p.x+d.x > WIDTH || p.y+d.y > HEIGHT) return NULL;
-    T* h = new T[(int)(d.x*d.y)];
+  void sample(T* m, glm::vec2 p, glm::vec2 d, GLenum ATTACH, GLenum FORMAT){
+    if(d.x <= 0 || d.y <= 0 || p.x+d.x > WIDTH || p.y+d.y > HEIGHT) return;
     glBindFramebuffer(GL_FRAMEBUFFER, fbo); glReadBuffer(ATTACH);
-    glReadPixels(p.x, p.y, d.x, d.y, FORMAT, GL_UNSIGNED_BYTE, h);
-    return h;
+    glReadPixels(p.x, p.y, d.x, d.y, FORMAT, GL_UNSIGNED_BYTE, m);
   }
-  int* sample(glm::vec2 p, glm::vec2 d){
-    return sample<int>(p, d, GL_COLOR_ATTACHMENT0, GL_RGBA);
+  void sample(int* m, glm::vec2 p, glm::vec2 d){
+    return sample<int>(m, p, d, GL_COLOR_ATTACHMENT0, GL_RGBA);
   }
-  char* sample(glm::vec2 p, glm::vec2 d, bool dAttach = true){
-    return sample<char>(p, d, GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT);
+  void sample(char* m, glm::vec2 p, glm::vec2 d, bool dAttach = true){
+    return sample<char>(m, p, d, GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT);
   }
 
 };

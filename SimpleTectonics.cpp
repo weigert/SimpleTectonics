@@ -1,6 +1,7 @@
 #include "TinyEngine/TinyEngine.h"
 #include "TinyEngine/include/helpers/color.h"
 #include "TinyEngine/include/helpers/image.h"
+#include "TinyEngine/include/helpers/timer.h"
 #include <noise/noise.h>
 #include <chrono>
 
@@ -26,12 +27,14 @@ int main( int argc, char* args[] ) {
 	World world(SEED);
 
 	//Setup Shaders
-	Shader voronoi({"source/shader/voronoi.vs", "source/shader/voronoi.fs"}, {"in_Quad", "in_Tex", "in_Centroid"});
-	Shader billboardshader({"source/shader/billboard.vs", "source/shader/billboard.fs"}, {"in_Quad", "in_Tex"});
 	Shader shader({"source/shader/default.vs", "source/shader/default.fs"}, {"in_Position", "in_Normal", "in_Color"});
 	Shader depth({"source/shader/depth.vs", "source/shader/depth.fs"}, {"in_Position"});
-	Shader diffusion({"source/shader/diffusion.vs", "source/shader/diffusion.fs"}, {"in_Quad", "in_Tex"});
-	Shader subduction({"source/shader/subduction.vs", "source/shader/subduction.fs"}, {"in_Quad", "in_Tex"}, {"colliding"});
+	Shader billboardshader({"source/shader/flat.vs", "source/shader/flat.fs"}, {"in_Quad", "in_Tex"});
+
+	Shader voronoi({"source/shader/voronoi.vs", "source/shader/voronoi.fs"}, {"in_Quad", "in_Tex", "in_Centroid"});
+	Shader diffusion({"source/shader/flat.vs", "source/shader/diffusion.fs"}, {"in_Quad", "in_Tex"});
+	Shader subduction({"source/shader/flat.vs", "source/shader/subduction.fs"}, {"in_Quad", "in_Tex"}, {"colliding"});
+	Shader sedimentation({"source/shader/flat.vs", "source/shader/sedimentation.fs"}, {"in_Quad", "in_Tex"}, {"colliding"});
 
 	//Utility Classes
 	Square2D flat;
@@ -50,10 +53,6 @@ int main( int argc, char* args[] ) {
 
 	Tiny::view.pipeline = [&](){
 
-		/*
-				Convert this into a heightmap!
-		*/
-
 		//Render Shadowmap
 		shadow.target();                  //Prepare Target
 		depth.use();                      //Prepare Shader
@@ -62,7 +61,8 @@ int main( int argc, char* args[] ) {
 		model.render(GL_TRIANGLES);       //Render Model
 
 		//Regular Image
-		Tiny::view.target(skyCol);
+		if(viewplates) Tiny::view.target(skyCol);
+		else Tiny::view.target(skyBlue);
 
 		shader.use();                   //Prepare Shader
 		shader.texture("shadowMap", shadow.depth);
@@ -89,8 +89,13 @@ int main( int argc, char* args[] ) {
 			billboardshader.uniform("model", flat.model);
 			flat.render();
 
-		}
+			billboardshader.use();
+			billboardshader.texture("imageTexture", world.heightA->texture);
+			flat.move(glm::vec3(-1.0+1.25/WIDTH*HEIGHT,1.0-0.25,0.0), 0, glm::vec3(1.0f*0.25/WIDTH*HEIGHT,0.25,0.0));
+			billboardshader.uniform("model", flat.model);
+			flat.render();
 
+		}
 
 	};
 
@@ -98,20 +103,16 @@ int main( int argc, char* args[] ) {
 
 	Tiny::loop([&](){ //Execute every frame
 
-
-
 		if(animate){
 
 			world.drift();
-			for(int i = 0; i < 50; i++)
-				world.diffuse(&diffusion, &subduction, &flat);
-
+			world.diffuse(&diffusion, &subduction, &flat);
+			world.addRock(&diffusion, &sedimentation, &flat);
 			world.update(&instance);
 			world.cluster(&voronoi, &instance);
 			model.construct(tectonicmesh, &world); //Reconstruct Updated Model
 
 		}
-
 
 	});
 
