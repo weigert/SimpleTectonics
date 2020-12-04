@@ -43,6 +43,8 @@ public:
 
     clustering = new Billboard(SIZE, SIZE);
     depthmap = new Billboard(SIZE, SIZE);
+    heightA = new Billboard(SIZE, SIZE);
+    heightB = new Billboard(SIZE, SIZE);
 
   }
 
@@ -132,14 +134,6 @@ void World::initialize(){
     return mix(vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 0.0, 0.0, 1.0), t);
   }));
 
-  //Construct a billboard, using a texture generated from the raw data
-  heightA = new Billboard(image::make<double>(vec2(SIZE, SIZE), heightmap, [](double t){
-    return mix(vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 1.0, 1.0, 1.0), t);
-  }));
-  heightB = new Billboard(image::make<double>(vec2(SIZE, SIZE), heightmap, [](double t){
-    return mix(vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 1.0, 1.0, 1.0), t);
-  }));
-
   //Generate Plates
   for(int i = 0; i < nplates; i++)
     plates.emplace_back(Plate(vec2(rand()%SIZE,rand()%SIZE)));
@@ -165,6 +159,7 @@ void World::initialize(){
 
     }
 
+    newseg->plate = nearest;
     nearest->seg.push_back(newseg);
 
   }
@@ -244,11 +239,14 @@ void World::addRock(Shader* diffusion, Shader* sedimentation, Square2D* flat){
   }
   sedimentation->buffer("colliding", colliding);
 
-  for(int i = 0; i < 15; i++){
+  heightB->target(vec3(0.0)); //Clear the Height Billboard to Black
+  heightA->target(vec3(0.0)); //Clear the Height Billboard to Black
+
+  for(int i = 0; i < 25; i++){
 
     heightB->target(false); //No-Clear Target
     diffusion->use();
-    diffusion->uniform("D", 0.05f);
+    diffusion->uniform("D", 0.1f);
     diffusion->uniform("model", mat4(1));
     diffusion->texture("map", heightA->texture);
     flat->render();
@@ -262,12 +260,55 @@ void World::addRock(Shader* diffusion, Shader* sedimentation, Square2D* flat){
 
   }
 
-
-  //Sample heatA into tmpmap
+  //Add Sedimentation Offset to Heightmap
   heightA->sample<int>(tmpmap, vec2(0), dim, GL_COLOR_ATTACHMENT0, GL_RGBA);
   for(int i = 0; i < dim.x*dim.y; i++)
-    heightmap[i] = color::i2rgba(tmpmap[i]).r/255.0f;
+    heightmap[i] += 0.2*color::i2rgba(tmpmap[i]).r/255.0f;
 
+  //Transport the Sediments using the Clusters
+  /*
+      For every element of the heightmap, find the cluster it belongs to.
+      Find the plate it belongs to.
+      Project it by adding the value to a temp map. then add to the heightmap.
+  */
+
+  //Convect!
+  /*
+  const float rate = 0.01;
+  double tmpheight[SIZE*SIZE];
+
+  for(int i = 0; i < dim.x*dim.y; i++){
+    tmpheight[i] = 0.0;
+  }
+
+  for(int i = 0; i < dim.x*dim.y; i++){
+
+    vec2 p = vec2(i/(int)dim.y, i%(int)dim.y);
+
+    //Segment Index at Position i, get speed
+    vec4 col = color::i2rgba(clustermap[i]);
+    int ind = col.x + col.y*256 + col.z*256*256;
+    ivec2 pjt = p+0.02f*segments[ind]->plate->speed;
+
+    if( pjt.x >= 0 && pjt.x < SIZE &&
+        pjt.y >= 0 && pjt.y < SIZE){
+          int bind = pjt.x*dim.y+pjt.y;
+          tmpheight[bind] = rate*heightmap[i];
+    }
+    heightmap[i] -= rate*heightmap[i];
+
+  }
+
+  std::cout<<"AYy"<<std::endl;
+
+  //Direct Transport
+  for(int i = 0; i < dim.x*dim.y; i++){
+//    heightmap[i] = 0;
+    heightmap[i] += tmpheight[i];
+  }
+  std::cout<<"BYy"<<std::endl;
+
+*/
 }
 
 
@@ -319,7 +360,7 @@ void World::update(Instance* inst){
 
     //Remove Empty Plates
     if(plates[i].seg.size() == 0){
-      plates[i].seg.erase(plates[i].seg.begin()+i);
+      plates.erase(plates.begin()+i);
       i--;
       continue;
     }
@@ -353,6 +394,9 @@ void World::update(Instance* inst){
       float angle = (float)(rand()%100)/100.0f*2.0f*PI;
       vec2 scan = *(s->pos);
       scan += 256.0f*R/2.0f*vec2(cos(angle), sin(angle));
+
+      if(scan.x < 0 || scan.x >= SIZE ||
+      scan.y < 0 || scan.y >= SIZE) continue;
 
       //Compute Color at Scan
       //Index of the current guy in general
@@ -431,6 +475,7 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
           d += glm::vec3(0, 10.0*w->segments[dind]->height, 0);
       }
       else{
+
         a += glm::vec3(0, w->scale*w->heightmap[i*(int)w->dim.y+j], 0);
         b += glm::vec3(0, w->scale*w->heightmap[i*(int)w->dim.y+j+1], 0);
         c += glm::vec3(0, w->scale*w->heightmap[(i+1)*(int)w->dim.y+j], 0);

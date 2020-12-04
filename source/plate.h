@@ -6,11 +6,14 @@
 ================================================================================
 */
 
+struct Plate;
+
 struct Litho{
 public:
 
   Litho(vec2* p):pos{p}{}
   Litho(float d, float t, vec2* p):pos{p},thickness{t},density{d}{}
+  Litho(float d, float t, vec2* p, Plate* pl):pos{p},thickness{t},density{d},plate{pl}{}
 
   glm::vec2* pos;
   float density = 0.5f;
@@ -18,6 +21,9 @@ public:
   float height = 0.0f;
   bool colliding = false;
   int collider = 0;
+
+  //Parent
+  Plate* plate;
 
   vec2 force(double* hm){
 
@@ -61,8 +67,8 @@ struct Plate {
   float mass = 0.0f;
   float inertia = 0.0f;
 
-  const float dt = 0.02f;
-  const float convection = 150.0f;
+  float dt = 0.02f;
+  float convection = 150.0f;
 
   void recenter(){
 

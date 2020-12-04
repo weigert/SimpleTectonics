@@ -24,8 +24,8 @@ void main(){
   fragColor = texture(map, ex_Tex);
 
   //Plate Separation
-  if(texture(cluster,ex_Tex) == vec4(1.0))
-    fragColor = mix(fragColor, cold, 0.2);
+  //if(texture(cluster,ex_Tex) == vec4(1.0))
+  //  fragColor = mix(fragColor, cold, 0.2);
 
   //Plate Collision
   int i = index(texture(cluster, ex_Tex).rgb);

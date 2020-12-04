@@ -1,6 +1,6 @@
 //GPU Accelerated Voronoi Controller Stuff
 bool animate = false;
-bool viewmap = false;
+bool viewmap = true;
 bool viewplates = true;
 
 float K = 2048;
