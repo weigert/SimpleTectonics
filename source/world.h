@@ -80,7 +80,7 @@ public:
   vector<vec2> centroids;  //Raw Position Buffer
   vector<Litho*> segments; //Segment Pointer Buffer
   vector<Plate> plates;        //Additional Data
-  const int nplates = 12;
+  const int nplates = 24;
 
   Billboard* clustering;
   Billboard* depthmap;
@@ -145,7 +145,7 @@ void World::initialize(){
 */
 
  for(unsigned int i = 0; i < SIZE*SIZE; i++)
-    heightmap[i] = 0.5;
+    heightmap[i] = 0.0;
 
   //Construct a billboard, using a texture generated from the raw data
   heatA = new Billboard(image::make<double>(vec2(SIZE, SIZE), heatmap, [](double t){
@@ -260,18 +260,13 @@ void World::diffuse(Shader* diffusion, Shader* subduction, Square2D* flat){
 }
 
 bool second = true;
-void World::addRock(Shader* cascade, Shader* sedimentation, Square2D* flat){
+void World::addRock(Shader* convection, Shader* cascading, Square2D* flat){
 
-
-  std::vector<int> colliding;
-  std::vector<float> height;
+  std::vector<vec2> speed;
   for(int i = 0; i < segments.size(); i++){
-    if(segments[i]->colliding) colliding.push_back(1);
-    else colliding.push_back(0);
-    height.push_back(segments[i]->height);
+    speed.push_back(segments[i]->speed);
   }
-  cascade->buffer("segheight", height);
-  sedimentation->buffer("colliding", colliding);
+  convection->buffer("speed", speed);
 
   if(second){
     heightB->target(vec3(0.5)); //Clear the Height Billboard to Black
@@ -279,51 +274,30 @@ void World::addRock(Shader* cascade, Shader* sedimentation, Square2D* flat){
     second = false;
   }
 
-
-
   for(int i = 0; i < 5; i++){
 
     heightB->target(false); //No-Clear Target
-    cascade->use();
-    cascade->uniform("D", 0.0f);
-    cascade->uniform("model", mat4(1));
-    cascade->texture("map", heightA->texture);
-    cascade->texture("cluster", clustering->texture);
+    convection->use();
+    convection->uniform("model", mat4(1));
+    convection->texture("map", heightA->texture);
+    convection->texture("cluster", clustering->texture);
     flat->render();
 
     heightA->target(false); //No-Clear Target
-    sedimentation->use();
-    sedimentation->uniform("model", mat4(1));
-    sedimentation->texture("map", heightB->texture);
-    sedimentation->texture("cluster", clustering->texture);
-    flat->render();
-
-  }
-
-  for(int i = 0; i < 5; i++){
-
-    heightB->target(false); //No-Clear Target
-    cascade->use();
-    cascade->uniform("D", 0.0f);
-    cascade->uniform("model", mat4(1));
-    cascade->texture("map", heightA->texture);
-    cascade->texture("cluster", clustering->texture);
-    flat->render();
-
-    heightA->target(false); //No-Clear Target
-    cascade->use();
-    cascade->uniform("D", 0.0f);
-    cascade->uniform("model", mat4(1));
-    cascade->texture("map", heightB->texture);
-    cascade->texture("cluster", clustering->texture);
+    cascading->use();
+    cascading->uniform("model", mat4(1));
+    cascading->texture("map", heightB->texture);
     flat->render();
 
   }
 
   //Add Sedimentation Offset to Heightmap
   heightA->sample<int>(tmpmap, vec2(0), dim, GL_COLOR_ATTACHMENT0, GL_RGBA);
-  for(int i = 0; i < dim.x*dim.y; i++)
-    heightmap[i] = color::i2rgba(tmpmap[i]).r/255.0f;
+  vec4 col;
+  for(int i = 0; i < dim.x*dim.y; i++){
+    col = color::i2rgba(tmpmap[i])/255.0f/255.0f/255.0f;
+    heightmap[i] = (col.x+col.y*256+col.z*256*256);
+  }
 
 }
 
@@ -477,7 +451,8 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
       c = glm::vec3(i+1, 0.0, j  );
       d = glm::vec3(i+1, 0.0, j+1);
 
-      vec4 stonecolor = glm::vec4(0.8,0.8,0.8,1.0);
+      //vec4 stonecolor = glm::vec4(0.8,0.8,0.8,1.0);
+      vec4 stonecolor = glm::vec4(0.6,0.68,0.45,1.0);
       vec4 collidecolor = glm::vec4(0.7,0.64,0.52,1.0);
       vec4 magmacolor = glm::vec4(0.84,0.17,0.05,1.0);
 

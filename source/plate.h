@@ -141,8 +141,8 @@ struct Plate {
       dir = *(seg[i]->pos) - (pos - dt*speed);
       _angle = angle(dir) -  (rotation - dt*angveloc);
 
-      seg[i]->speed = length(dir)*vec2(cos(rotation+_angle),sin(rotation+_angle));
-      *(seg[i]->pos) = pos + seg[i]->speed;
+      seg[i]->speed = (pos + length(dir)*vec2(cos(rotation+_angle),sin(rotation+_angle)))-*(seg[i]->pos);
+      *(seg[i]->pos) = pos + length(dir)*vec2(cos(rotation+_angle),sin(rotation+_angle)); //Relative Speed
 
     }
 

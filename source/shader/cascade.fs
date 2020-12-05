@@ -3,67 +3,62 @@ in vec2 ex_Tex;
 out vec4 fragColor;
 
 uniform sampler2D map;
-uniform sampler2D cluster;
 
 vec3 black = vec3(0.0, 0.0, 0.0);
 vec3 white = vec3(1.0, 1.0, 1.0);
 
-uniform float D;
-
 const float maxdiff = 0.0;
 
-layout (std430, binding = 0) buffer segheight {
-  float h[];
+layout (std430, binding = 0) buffer speed {
+  vec2 v[];
 };
-
 
 int index(vec3 a){
   a = a*255.0f;
   return int((a.x + a.y*256 + a.z*256*256));
 }
 
-vec3 cascade(vec3 p, vec3 n, float m){
+int num(vec3 a){
+  a = a*255.0f;
+  return int((a.x + a.y*256 + a.z*256*256));
+}
 
-  //Pile Size Difference
-  vec3 diff = n - p;
-  vec3 excess = (abs(diff)-m)/2.0;
+vec3 col(int i){
+  float r = ((i >>  0) & 0xff)/255.0f;
+  float g = ((i >>  8) & 0xff)/255.0f;
+  float b = ((i >> 16) & 0xff)/255.0f;
+  return vec3(r,g,b);
+}
 
-//  if(diff.x < 0) excess.x = min(excess.x, n.x);
-//  if(diff.y < 0) excess.y = min(excess.y, n.y);
-//  if(diff.z < 0) excess.z = min(excess.z, n.z);
+int cascade(int p, int n){
 
-//  if(diff.x > 0) excess.x = min(excess.x, p.x);
-//  if(diff.y > 0) excess.y = min(excess.y, p.y);
-//  if(diff.z > 0) excess.z = min(excess.z, p.z);
+  int diff = n - p;
+  int excess = int(abs(diff)/2.0f)-250000;
 
-  if(diff.x < 0) excess.x *= -1;
-  if(diff.y < 0) excess.y *= -1;
-  if(diff.z < 0) excess.z *= -1;
+  if(diff == 0) return 0;
+  if(diff > 0) return min(excess,n);
+  if(diff < 0) return -min(excess,p);
 
-  if(diff.x == 0) excess.x = 0.0;
-  if(diff.y == 0) excess.y = 0.0;
-  if(diff.z == 0) excess.z = 0.0;
-
-  return excess;
 }
 
 vec3 diffuse(){
+
   vec2 p = ex_Tex; //Scale
-  float k = 25;
 
-  vec3 c = textureOffset(map, p, ivec2(0,0)).xyz; //Self
-  float ch = k*h[index(textureOffset(cluster, p, ivec2(0,0)).xyz)];
+  //Get the value at Position
+  int c = num(textureOffset(map, p, ivec2(0,0)).xyz);
 
-  vec3 a = cascade(c + ch, textureOffset(map, p, ivec2( 1, 0)).xyz + k*h[index(textureOffset(cluster, p, ivec2( 1, 0)).xyz)], maxdiff );
-      a += cascade(c + ch, textureOffset(map, p, ivec2( 0, 1)).xyz + k*h[index(textureOffset(cluster, p, ivec2( 0, 1)).xyz)], maxdiff );
-      a += cascade(c + ch, textureOffset(map, p, ivec2(-1, 0)).xyz + k*h[index(textureOffset(cluster, p, ivec2(-1, 0)).xyz)], maxdiff );
-      a += cascade(c + ch, textureOffset(map, p, ivec2( 0,-1)).xyz + k*h[index(textureOffset(cluster, p, ivec2( 0,-1)).xyz)], maxdiff );
-      //a += cascade(c + ch,textureOffset(map, p, ivec2(-1,-1)).xyz + 25*sqrt(2)*h[index(textureOffset(cluster, p, ivec2(-1,-1)).xyz)], abs(ch - h[index(textureOffset(cluster, p, ivec2(-1,-1)).xyz)]) + maxdiff );
-      //a += cascade(c + ch,textureOffset(map, p, ivec2( 1,-1)).xyz + 25*sqrt(2)*h[index(textureOffset(cluster, p, ivec2( 1,-1)).xyz)], abs(ch - h[index(textureOffset(cluster, p, ivec2( 1,-1)).xyz)]) + maxdiff );
-      //a += cascade(c + ch,textureOffset(map, p, ivec2(-1, 1)).xyz + 25*sqrt(2)*h[index(textureOffset(cluster, p, ivec2(-1, 1)).xyz)], abs(ch - h[index(textureOffset(cluster, p, ivec2(-1, 1)).xyz)]) + maxdiff );
-      //a += cascade(c + ch,textureOffset(map, p, ivec2( 1, 1)).xyz + 25*sqrt(2)*h[index(textureOffset(cluster, p, ivec2( 1, 1)).xyz)], abs(ch - h[index(textureOffset(cluster, p, ivec2( 1, 1)).xyz)]) + maxdiff );
+  int a  = cascade(c, num(textureOffset(map, p, ivec2( 1, 0)).xyz));
+      a += cascade(c, num(textureOffset(map, p, ivec2(-1, 0)).xyz));
+      a += cascade(c, num(textureOffset(map, p, ivec2( 0, 1)).xyz));
+      a += cascade(c, num(textureOffset(map, p, ivec2( 0,-1)).xyz));
+      a += cascade(c, num(textureOffset(map, p, ivec2(-1,-1)).xyz));
+      a += cascade(c, num(textureOffset(map, p, ivec2( 1,-1)).xyz));
+      a += cascade(c, num(textureOffset(map, p, ivec2(-1, 1)).xyz));
+      a += cascade(c, num(textureOffset(map, p, ivec2( 1, 1)).xyz));
 
-  return c+0.2*a;
+  //Return the Colorized Version
+  return col(int(c+0.05*a));
 }
 
 void main(){

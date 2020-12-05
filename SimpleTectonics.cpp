@@ -32,10 +32,11 @@ int main( int argc, char* args[] ) {
 	Shader billboardshader({"source/shader/flat.vs", "source/shader/flat.fs"}, {"in_Quad", "in_Tex"});
 
 	Shader voronoi({"source/shader/voronoi.vs", "source/shader/voronoi.fs"}, {"in_Quad", "in_Tex", "in_Centroid"});
+
 	Shader diffusion({"source/shader/flat.vs", "source/shader/diffusion.fs"}, {"in_Quad", "in_Tex"});
-	Shader cascade({"source/shader/flat.vs", "source/shader/cascade.fs"}, {"in_Quad", "in_Tex"}, {"segheight"});
+	Shader cascading({"source/shader/flat.vs", "source/shader/cascade.fs"}, {"in_Quad", "in_Tex"});
 	Shader subduction({"source/shader/flat.vs", "source/shader/subduction.fs"}, {"in_Quad", "in_Tex"}, {"colliding"});
-	Shader sedimentation({"source/shader/flat.vs", "source/shader/sedimentation.fs"}, {"in_Quad", "in_Tex"}, {"colliding"});
+	Shader convection({"source/shader/flat.vs", "source/shader/convection.fs"}, {"in_Quad", "in_Tex"}, {"speed"});
 
 	//Utility Classes
 	Square2D flat;
@@ -106,7 +107,7 @@ int main( int argc, char* args[] ) {
 
 			world.drift();
 			world.diffuse(&diffusion, &subduction, &flat);
-			world.addRock(&cascade, &sedimentation, &flat);
+			world.addRock(&convection, &cascading, &flat);
 			world.update(&instance);
 			world.cluster(&voronoi, &instance);
 

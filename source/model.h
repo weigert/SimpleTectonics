@@ -8,7 +8,7 @@ float R = 2.0f*sqrt(4.0f/3.14159265f/K);
 
 #define SIZE 256
 
-float sealevel = 1.2;
+float sealevel = 0.65;
 
 
 Handle interfaceFunc = [&](){
