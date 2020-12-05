@@ -18,7 +18,7 @@ int main( int argc, char* args[] ) {
 	Tiny::window("Plate Tectonics Simulation", WIDTH, HEIGHT);
 
 	Tiny::event.handler  = eventHandler;
-	Tiny::view.interface = [](){};
+	Tiny::view.interface = interfaceFunc;
 
 	//Generate Seeded World
 	int SEED = time(NULL);
@@ -33,6 +33,7 @@ int main( int argc, char* args[] ) {
 
 	Shader voronoi({"source/shader/voronoi.vs", "source/shader/voronoi.fs"}, {"in_Quad", "in_Tex", "in_Centroid"});
 	Shader diffusion({"source/shader/flat.vs", "source/shader/diffusion.fs"}, {"in_Quad", "in_Tex"});
+	Shader cascade({"source/shader/flat.vs", "source/shader/cascade.fs"}, {"in_Quad", "in_Tex"}, {"segheight"});
 	Shader subduction({"source/shader/flat.vs", "source/shader/subduction.fs"}, {"in_Quad", "in_Tex"}, {"colliding"});
 	Shader sedimentation({"source/shader/flat.vs", "source/shader/sedimentation.fs"}, {"in_Quad", "in_Tex"}, {"colliding"});
 
@@ -99,20 +100,19 @@ int main( int argc, char* args[] ) {
 
 	};
 
-	int m = 0;
-
 	Tiny::loop([&](){ //Execute every frame
 
 		if(animate){
 
 			world.drift();
 			world.diffuse(&diffusion, &subduction, &flat);
-			world.addRock(&diffusion, &sedimentation, &flat);
+			world.addRock(&cascade, &sedimentation, &flat);
 			world.update(&instance);
 			world.cluster(&voronoi, &instance);
-			model.construct(tectonicmesh, &world); //Reconstruct Updated Model
 
 		}
+
+		model.construct(tectonicmesh, &world); //Reconstruct Updated Model
 
 	});
 

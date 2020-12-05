@@ -3,10 +3,19 @@ bool animate = false;
 bool viewmap = true;
 bool viewplates = true;
 
-float K = 2048;
+float K = 4*2048;
 float R = 2.0f*sqrt(4.0f/3.14159265f/K);
 
 #define SIZE 256
+
+float sealevel = 1.2;
+
+
+Handle interfaceFunc = [&](){
+  ImGui::Text("Simulation Controller");
+  ImGui::DragFloat("Effect", &sealevel, 0.01, 0, 1);
+};
+
 
 /*
 Rendering Stuff
@@ -19,8 +28,8 @@ float zoom = 0.2;
 float zoomInc = 0.005;
 
 //Rotation and View
-float rotation = 180.0f;
-glm::vec3 cameraPos = glm::vec3(50, 50, 50);
+float rotation = 0.0f;
+glm::vec3 cameraPos = glm::vec3(-50, 50, -50);
 glm::vec3 lookPos = glm::vec3(0, 0, 0);
 glm::mat4 camera = glm::rotate(glm::lookAt(cameraPos, lookPos, glm::vec3(0,1,0)), glm::radians(rotation), glm::vec3(0.0f, 1.0f, 0.0f));
 
@@ -31,7 +40,6 @@ glm::vec3 viewPos = glm::vec3(SIZE/2.0, 40.0, SIZE/2.0);
 //Lighting and Shading
 glm::vec3 skyCol = glm::vec4(0.17, 0.11, 0.18, 1.0f);
 glm::vec3 skyBlue = glm::vec4(0.7, 0.95, 0.91, 1.0f);
-
 
 glm::vec3 lightPos = glm::vec3(-100.0f, 100.0f, -150.0f);
 glm::vec3 lightCol = glm::vec3(1.0f, 1.0f, 0.9f);

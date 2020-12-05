@@ -9,7 +9,6 @@ layout (std430, binding = 0) buffer colliding {
   int c[];
 };
 
-
 int index(vec3 a){
   a = a*255.0f;
   return int((a.x + a.y*256 + a.z*256*256));
@@ -24,13 +23,12 @@ void main(){
   fragColor = texture(map, ex_Tex);
 
   //Plate Separation
-  //if(texture(cluster,ex_Tex) == vec4(1.0))
-  //  fragColor = mix(fragColor, cold, 0.2);
+  if(texture(cluster,ex_Tex) == vec4(1.0))
+    fragColor -= vec4(vec3(0.1),0);//mix(fragColor, cold, 0.2);
 
   //Plate Collision
   int i = index(texture(cluster, ex_Tex).rgb);
   if(c[i] == 1)
-    fragColor += vec4(vec3(0.01), 0);
-  //  fragColor = mix(fragColor, warm, 0.05);
+    fragColor += vec4(vec3(0.1), 0);
 
 }
