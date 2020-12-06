@@ -62,6 +62,8 @@ public:
     delete[] clustermap;
     delete[] heatmap;
     delete[] heightmap;
+    delete[] tmpmap;
+
   }
 
   //General Information
@@ -92,14 +94,12 @@ public:
   void initialize();
   void drift();
   void cluster(Shader* voronoi, Instance* inst);
-  void diffuse(Shader* diffusion, Shader* subduction, Square2D* flat);
-  void addRock(Shader* diffusoin, Shader* sedimentation, Square2D* flat);
+  void diffuse(Shader* diffusion, Shader* subduction, Square2D* flat, int n);
+  void addRock(Shader* diffusoin, Shader* sedimentation, Square2D* flat, int n);
   void update(Instance* inst);
 
   void addNode(glm::vec2 pos);
   void delNode(int ind);
-
-  void diffuse(float D, float dt);
 
 };
 
@@ -125,24 +125,6 @@ void World::initialize(){
   for(unsigned int i = 0; i < SIZE; i++)
     for(unsigned int j = 0; j < SIZE; j++)
       heatmap[j+i*SIZE] = (heatmap[j+i*SIZE] - min)/(max-min);
-
-/*
-  //Generate Randomized Height
-  min = 1.0;
-  max = -1.0;
-  for(unsigned int i = 0; i < SIZE; i++){
-    for(unsigned int j = 0; j < SIZE; j++){
-      heightmap[j+i*SIZE] = perlin.GetValue((float)i/(float)SIZE, (float)j/(float)SIZE, SEED);
-      if(heightmap[j+i*SIZE] > max) max = heightmap[j+i*SIZE];
-      if(heightmap[j+i*SIZE] < min) min = heightmap[j+i*SIZE];
-    }
-  }
-
-  //Normalize Heightmap
-  for(unsigned int i = 0; i < SIZE; i++)
-    for(unsigned int j = 0; j < SIZE; j++)
-      heightmap[j+i*SIZE] = (heightmap[j+i*SIZE] - min)/(max-min);
-*/
 
  for(unsigned int i = 0; i < SIZE*SIZE; i++)
     heightmap[i] = 0.0;
@@ -188,7 +170,6 @@ void World::initialize(){
 
     }
 
-    newseg->plate = nearest;
     nearest->seg.push_back(newseg);
 
   }
@@ -225,7 +206,7 @@ void World::drift(){
 
 }
 
-void World::diffuse(Shader* diffusion, Shader* subduction, Square2D* flat){
+void World::diffuse(Shader* diffusion, Shader* subduction, Square2D* flat, int n){
 
   std::vector<int> colliding;
   for(int i = 0; i < segments.size(); i++){
@@ -234,7 +215,7 @@ void World::diffuse(Shader* diffusion, Shader* subduction, Square2D* flat){
   }
   subduction->buffer("colliding", colliding);
 
-  for(int i = 0; i < 50; i++){
+  for(int i = 0; i < n; i++){
 
     heatB->target(false); //No-Clear Target
     diffusion->use();
@@ -259,8 +240,7 @@ void World::diffuse(Shader* diffusion, Shader* subduction, Square2D* flat){
 
 }
 
-bool second = true;
-void World::addRock(Shader* convection, Shader* cascading, Square2D* flat){
+void World::addRock(Shader* convection, Shader* cascading, Square2D* flat, int n){
 
   std::vector<vec2> speed;
   std::vector<float> height;
@@ -271,13 +251,7 @@ void World::addRock(Shader* convection, Shader* cascading, Square2D* flat){
   cascading->buffer("height", height);
   convection->buffer("speed", speed);
 
-  if(second){
-    heightB->target(vec3(0.3)); //Clear the Height Billboard to Black
-    heightA->target(vec3(0.3)); //Clear the Height Billboard to Black
-    second = false;
-  }
-
-  for(int i = 0; i < 15; i++){
+  for(int i = 0; i < n; i++){
 
     heightB->target(false); //No-Clear Target
     convection->use();
@@ -305,12 +279,6 @@ void World::addRock(Shader* convection, Shader* cascading, Square2D* flat){
 
 }
 
-
-void World::diffuse(float D, float dt){
-
-};
-
-
 /*
 ================================================================================
                             Add / Remove Centroids
@@ -335,7 +303,6 @@ void World::addNode(glm::vec2 pos){
 
 	}
 
-  newseg->plate = nearest;
 	nearest->seg.push_back(newseg);
 
 	for(int i = 0; i < segments.size(); i++)
@@ -422,11 +389,9 @@ void World::update(Instance* inst){
 ================================================================================
 */
 
-int first = 2;
-
 std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
 
-  if(first) m->indices.clear();
+  m->indices.clear();
   m->positions.clear();
   m->normals.clear();
   m->colors.clear();
@@ -457,10 +422,8 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
 
       float tscale = 150.0f;
 
-
       vec4 collidecolor = glm::vec4(0.7,0.64,0.52,1.0);
       vec4 magmacolor = glm::vec4(0.84,0.17,0.05,1.0);
-
       vec4 watercolor = glm::vec4(0.5,0.64,0.87,1.0);
       vec4 earthcolor = glm::vec4(0.75,0.59,0.52,1.0);
       vec4 stonecolor = glm::vec4(0.68,0.7,0.62,1.0);
@@ -477,10 +440,10 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
       }
       if(!viewplates){
 
-        a += glm::vec3(0, tscale*w->heightmap[i*(int)w->dim.y+j], 0);
-        b += glm::vec3(0, tscale*w->heightmap[i*(int)w->dim.y+j+1], 0);
-        c += glm::vec3(0, tscale*w->heightmap[(i+1)*(int)w->dim.y+j], 0);
-        d += glm::vec3(0, tscale*w->heightmap[(i+1)*(int)w->dim.y+j+1], 0);
+        a += glm::vec3(0, tscale*(w->heightmap[i*(int)w->dim.y+j]-sealevel), 0);
+        b += glm::vec3(0, tscale*(w->heightmap[i*(int)w->dim.y+j+1]-sealevel), 0);
+        c += glm::vec3(0, tscale*(w->heightmap[(i+1)*(int)w->dim.y+j]-sealevel), 0);
+        d += glm::vec3(0, tscale*(w->heightmap[(i+1)*(int)w->dim.y+j+1]-sealevel), 0);
 
         if(a.y < tscale*sealevel) a.y = tscale*sealevel;
         if(b.y < tscale*sealevel) b.y = tscale*sealevel;
@@ -506,11 +469,9 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
       //UPPER TRIANGLE
 
       //Add Indices
-      if(first){
-        m->indices.push_back(m->positions.size()/3+0);
-        m->indices.push_back(m->positions.size()/3+1);
-        m->indices.push_back(m->positions.size()/3+2);
-      }
+      m->indices.push_back(m->positions.size()/3+0);
+      m->indices.push_back(m->positions.size()/3+1);
+      m->indices.push_back(m->positions.size()/3+2);
 
       add3(m->positions,a);
       add3(m->positions,b);
@@ -540,16 +501,6 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
         else add4(m->colors,magmacolor);
       }
       else{
-    /*    if(a.y <= tscale*sealevel) add4(m->colors, watercolor);
-        else if(n1.y < steepness) add4(m->colors, stonecolor);
-        else add4(m->colors, earthcolor);
-        if(b.y <= tscale*sealevel) add4(m->colors, watercolor);
-        else if(n1.y < steepness) add4(m->colors, stonecolor);
-        else add4(m->colors, earthcolor);
-        if(c.y <= tscale*sealevel) add4(m->colors, watercolor);
-        else if(n1.y < steepness) add4(m->colors, stonecolor);
-        else add4(m->colors, earthcolor);
-        */
         stonecolor = mix(stonecolor, earthcolor, 2*n1.y-1);
         if(a.y <= tscale*sealevel) add4(m->colors, watercolor);
         else add4(m->colors, stonecolor);
@@ -559,11 +510,9 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
         else add4(m->colors, stonecolor);
       }
 
-      if(first){
-        m->indices.push_back(m->positions.size()/3+0);
-        m->indices.push_back(m->positions.size()/3+1);
-        m->indices.push_back(m->positions.size()/3+2);
-      }
+      m->indices.push_back(m->positions.size()/3+0);
+      m->indices.push_back(m->positions.size()/3+1);
+      m->indices.push_back(m->positions.size()/3+2);
 
       add3(m->positions,d);
       add3(m->positions,c);
@@ -594,18 +543,6 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
         else add4(m->colors,magmacolor);
       }
       else{
-        /*
-        if(d.y <= tscale*sealevel) add4(m->colors, watercolor);
-        else if(n2.y < steepness) add4(m->colors, stonecolor);
-        else add4(m->colors, earthcolor);
-        if(c.y <= tscale*sealevel) add4(m->colors, watercolor);
-        else if(n2.y < steepness) add4(m->colors, stonecolor);
-        else add4(m->colors, earthcolor);
-        if(b.y <= tscale*sealevel) add4(m->colors, watercolor);
-        else if(n2.y < steepness) add4(m->colors, stonecolor);
-        else add4(m->colors, earthcolor);
-        */
-
         stonecolor = mix(stonecolor, earthcolor, 2*n2.y-1);
         if(d.y <= tscale*sealevel) add4(m->colors, watercolor);
         else add4(m->colors, stonecolor);
@@ -617,7 +554,5 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
 
     }
   }
-
-  first--;
 
 };

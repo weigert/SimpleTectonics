@@ -29,12 +29,11 @@ int main( int argc, char* args[] ) {
 	//Setup Shaders
 	Shader shader({"source/shader/default.vs", "source/shader/default.fs"}, {"in_Position", "in_Normal", "in_Color"});
 	Shader depth({"source/shader/depth.vs", "source/shader/depth.fs"}, {"in_Position"});
+	Shader voronoi({"source/shader/voronoi.vs", "source/shader/voronoi.fs"}, {"in_Quad", "in_Tex", "in_Centroid"});
 	Shader billboardshader({"source/shader/flat.vs", "source/shader/flat.fs"}, {"in_Quad", "in_Tex"});
 
-	Shader voronoi({"source/shader/voronoi.vs", "source/shader/voronoi.fs"}, {"in_Quad", "in_Tex", "in_Centroid"});
-
-	Shader diffusion({"source/shader/flat.vs", "source/shader/diffusion.fs"}, {"in_Quad", "in_Tex"});
-	Shader cascading({"source/shader/flat.vs", "source/shader/cascade.fs"}, {"in_Quad", "in_Tex"}, {"height"});
+	Shader diffusion({"source/shader/flat.vs",  "source/shader/diffusion.fs"},  {"in_Quad", "in_Tex"});
+	Shader cascading({"source/shader/flat.vs",  "source/shader/cascading.fs"},  {"in_Quad", "in_Tex"}, {"height"});
 	Shader subduction({"source/shader/flat.vs", "source/shader/subduction.fs"}, {"in_Quad", "in_Tex"}, {"colliding"});
 	Shader convection({"source/shader/flat.vs", "source/shader/convection.fs"}, {"in_Quad", "in_Tex"}, {"speed"});
 
@@ -47,35 +46,35 @@ int main( int argc, char* args[] ) {
 	Instance instance(&flat);
 	instance.addBuffer(world.centroids);
 
-	int n = 0;
-	float us = 0.0; //Rolling average execution time calculation in microseconds (us)
-
 	world.cluster(&voronoi, &instance);
 	model.construct(tectonicmesh, &world); //Reconstruct Updated Model
 
+	world.heightB->target(vec3(0.3));
+	world.heightA->target(vec3(0.3));
+
+	//Rendering Pipeline
+
 	Tiny::view.pipeline = [&](){
 
-		//Render Shadowmap
-		shadow.target();                  //Prepare Target
-		depth.use();                      //Prepare Shader
+		shadow.target();                  																		//Prepare Target
+		depth.use();                      																		//Prepare Shader
 		model.model = glm::translate(glm::mat4(1.0), -viewPos);
-		depth.uniform("dmvp", depthProjection * depthCamera * model.model);
-		model.render(GL_TRIANGLES);       //Render Model
+		depth.uniform("dmvp", depthProjection*depthCamera*model.model);
+		model.render(GL_TRIANGLES);       																		//Render Model
 
-		//Regular Image
 		if(viewplates) Tiny::view.target(skyCol);
 		else Tiny::view.target(skyBlue);
 
-		shader.use();                   //Prepare Shader
+		shader.use();                  																				//Prepare Shader
 		shader.texture("shadowMap", shadow.depth);
     shader.uniform("lightCol", lightCol);
     shader.uniform("lightPos", lightPos);
     shader.uniform("lookDir", lookPos-cameraPos);
     shader.uniform("lightStrength", lightStrength);
     shader.uniform("projectionCamera", projection * camera);
-    shader.uniform("dbmvp", biasMatrix * depthProjection * depthCamera * glm::mat4(1.0f));
+    shader.uniform("dbmvp", biasMatrix*depthProjection*depthCamera);
     shader.uniform("model", model.model);
-    model.render(GL_TRIANGLES);    //Render Model
+    model.render(GL_TRIANGLES);    																				//Render Model
 
 		if(viewmap){
 
@@ -106,8 +105,8 @@ int main( int argc, char* args[] ) {
 		if(animate){
 
 			world.drift();
-			world.diffuse(&diffusion, &subduction, &flat);
-			world.addRock(&convection, &cascading, &flat);
+			world.diffuse(&diffusion, &subduction, &flat, 25);
+			world.addRock(&convection, &cascading, &flat, 15);
 			world.update(&instance);
 			world.cluster(&voronoi, &instance);
 

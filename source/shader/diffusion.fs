@@ -4,24 +4,20 @@ out vec4 fragColor;
 
 uniform sampler2D map;
 
-vec3 black = vec3(0.0, 0.0, 0.0);
-vec3 white = vec3(1.0, 1.0, 1.0);
-
 uniform float D;
 
-vec3 diffuse(){
-  vec2 p = ex_Tex; //Scale
-  vec3 c = textureOffset(map, p, ivec2(0,0)).xyz; //Self
+vec3 diffuse(float rate){
+  vec2 p = ex_Tex;
+  vec3 c = textureOffset(map, p, ivec2(0,0)).xyz;
 
-  vec3 fx = textureOffset(map, p, ivec2( 1, 0)).xyz-c;
-      fx += textureOffset(map, p, ivec2(-1, 0)).xyz-c;
+  vec3 diff = textureOffset(map, p, ivec2( 1, 0)).xyz-c;
+      diff += textureOffset(map, p, ivec2(-1, 0)).xyz-c;
+      diff += textureOffset(map, p, ivec2( 0, 1)).xyz-c;
+      diff += textureOffset(map, p, ivec2( 0,-1)).xyz-c;
 
-  vec3 fy = textureOffset(map, p, ivec2( 0, 1)).xyz-c;
-      fy += textureOffset(map, p, ivec2( 0,-1)).xyz-c;
-
-  return c+D*(fx+fy);
+  return c+rate*diff;
 }
 
 void main(){
-  fragColor = vec4(diffuse(), 1.0);
+  fragColor = vec4(diffuse(D), 1.0);
 }

@@ -6,14 +6,11 @@
 ================================================================================
 */
 
-struct Plate;
-
 struct Litho{
 public:
 
   Litho(vec2* p):pos{p}{}
   Litho(float d, float t, vec2* p):pos{p},thickness{t},density{d}{}
-  Litho(float d, float t, vec2* p, Plate* pl):pos{p},thickness{t},density{d},plate{pl}{}
 
   glm::vec2* pos;
   vec2 speed = vec2(0);
@@ -23,9 +20,6 @@ public:
   bool colliding = false;
   int collider = 0;
   float growth = 0.0f;
-
-  //Parent
-  Plate* plate;
 
   vec2 force(double* hm){
 

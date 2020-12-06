@@ -9,14 +9,13 @@ layout (std430, binding = 0) buffer colliding {
   int c[];
 };
 
-
 int index(vec3 a){
   a = a*255.0f;
   return int((a.x + a.y*256 + a.z*256*256));
 }
 
-vec4 cold = vec4(0,0,0,1);
-vec4 warm = vec4(1,0,0,1);
+const vec4 cold = vec4(0,0,0,1);
+const vec4 warm = vec4(1,0,0,1);
 
 void main(){
 
