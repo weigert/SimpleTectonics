@@ -193,7 +193,7 @@ struct Plate {
 
         //Reset and Shift
         scan = *(s->pos);
-        scan += 256.0f*R/12.0f*glm::vec2(cos((float)j/(float)n*2.0f*PI), sin((float)j/(float)n*2.0f*PI));
+        scan += SIZE*R/12.0f*glm::vec2(cos((float)j/(float)n*2.0f*PI), sin((float)j/(float)n*2.0f*PI));
 
         //Extract Scan Index
         if( scan.x >= SIZE || scan.x < 0 ||

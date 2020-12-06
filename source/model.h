@@ -3,9 +3,8 @@ bool animate = false;
 bool viewmap = true;
 bool viewplates = true;
 
-float K = 4*2048;
+float K = 2048;
 float R = 2.0f*sqrt(4.0f/3.14159265f/K);
-
 #define SIZE 256
 
 float sealevel = 0.0;

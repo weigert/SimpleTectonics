@@ -360,7 +360,7 @@ void World::update(Instance* inst){
 
       float angle = (float)(rand()%100)/100.0f*2.0f*PI;
       vec2 scan = *(s->pos);
-      scan += 256.0f*R/2.0f*vec2(cos(angle), sin(angle));
+      scan += SIZE*R/2.0f*vec2(cos(angle), sin(angle));
 
       if(scan.x < 0 || scan.x >= SIZE ||
       scan.y < 0 || scan.y >= SIZE) continue;

@@ -40,10 +40,10 @@ vec3 convect(float rate){
 
   int diff = 0;                               //Difference
 
-  if(sfy.x < 0) diff += abs(int(sfx.x*cfx));  //Neighbor Contribution
-  if(sby.x > 0) diff += abs(int(sbx.x*cbx));
-  if(sfy.y < 0) diff += abs(int(sfy.y*cfy));
-  if(sby.y > 0) diff += abs(int(sby.y*cby));
+  if(sfx.x > 0) diff += abs(int(sfx.x*cfx));  //Neighbor Contribution
+  if(sbx.x < 0) diff += abs(int(sbx.x*cbx));
+  if(sfy.y > 0) diff += abs(int(sfy.y*cfy));
+  if(sby.y < 0) diff += abs(int(sby.y*cby));
 
   diff -= abs(int(s.x*c));                    //Self Distribution
   diff -= abs(int(s.y*c));
