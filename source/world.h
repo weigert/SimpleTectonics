@@ -272,8 +272,8 @@ void World::addRock(Shader* convection, Shader* cascading, Square2D* flat){
   convection->buffer("speed", speed);
 
   if(second){
-    heightB->target(vec3(0.5)); //Clear the Height Billboard to Black
-    heightA->target(vec3(0.5)); //Clear the Height Billboard to Black
+    heightB->target(vec3(0.3)); //Clear the Height Billboard to Black
+    heightA->target(vec3(0.3)); //Clear the Height Billboard to Black
     second = false;
   }
 
@@ -457,13 +457,13 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
 
       float tscale = 150.0f;
 
-      //vec4 stonecolor = glm::vec4(0.8,0.8,0.8,1.0);
-      vec4 stonecolor = glm::vec4(0.6,0.68,0.45,1.0);
+
       vec4 collidecolor = glm::vec4(0.7,0.64,0.52,1.0);
       vec4 magmacolor = glm::vec4(0.84,0.17,0.05,1.0);
 
       vec4 watercolor = glm::vec4(0.5,0.64,0.87,1.0);
-      vec4 earthcolor = glm::vec4(0.68,0.7,0.62,1.0);
+      vec4 earthcolor = glm::vec4(0.75,0.59,0.52,1.0);
+      vec4 stonecolor = glm::vec4(0.68,0.7,0.62,1.0);
 
       if(viewplates){
         if( aind < w->centroids.size() )
@@ -515,6 +515,9 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
       add3(m->positions,a);
       add3(m->positions,b);
       add3(m->positions,c);
+      glm::vec3 n1 = -1.0f*glm::normalize(glm::cross(a-b, c-b));
+      for(int i = 0; i < 3; i++)
+        add3(m->normals,n1);
 
       if(viewplates){
         if(aind < w->segments.size()){
@@ -537,18 +540,24 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
         else add4(m->colors,magmacolor);
       }
       else{
-        if(a.y > tscale*sealevel) add4(m->colors, stonecolor);
-        else add4(m->colors, watercolor);
-        if(b.y > tscale*sealevel) add4(m->colors, stonecolor);
-        else add4(m->colors, watercolor);
-        if(c.y > tscale*sealevel) add4(m->colors, stonecolor);
-        else add4(m->colors, watercolor);
+    /*    if(a.y <= tscale*sealevel) add4(m->colors, watercolor);
+        else if(n1.y < steepness) add4(m->colors, stonecolor);
+        else add4(m->colors, earthcolor);
+        if(b.y <= tscale*sealevel) add4(m->colors, watercolor);
+        else if(n1.y < steepness) add4(m->colors, stonecolor);
+        else add4(m->colors, earthcolor);
+        if(c.y <= tscale*sealevel) add4(m->colors, watercolor);
+        else if(n1.y < steepness) add4(m->colors, stonecolor);
+        else add4(m->colors, earthcolor);
+        */
+        stonecolor = mix(stonecolor, earthcolor, 2*n1.y-1);
+        if(a.y <= tscale*sealevel) add4(m->colors, watercolor);
+        else add4(m->colors, stonecolor);
+        if(b.y <= tscale*sealevel) add4(m->colors, watercolor);
+        else add4(m->colors, stonecolor);
+        if(c.y <= tscale*sealevel) add4(m->colors, watercolor);
+        else add4(m->colors, stonecolor);
       }
-
-      glm::vec3 n1 = -1.0f*glm::normalize(glm::cross(a-b, c-b));
-      for(int i = 0; i < 3; i++)
-        add3(m->normals,n1);
-
 
       if(first){
         m->indices.push_back(m->positions.size()/3+0);
@@ -559,6 +568,9 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
       add3(m->positions,d);
       add3(m->positions,c);
       add3(m->positions,b);
+      glm::vec3 n2 = -1.0f*glm::normalize(glm::cross(d-c, b-c));
+      for(int i = 0; i < 3; i++)
+        add3(m->normals, n2);
 
       if(viewplates){
         if(dind < w->segments.size()){
@@ -582,18 +594,26 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
         else add4(m->colors,magmacolor);
       }
       else{
-        if(d.y > tscale*sealevel) add4(m->colors, stonecolor);
-        else add4(m->colors, watercolor);
-        if(c.y > tscale*sealevel) add4(m->colors, stonecolor);
-        else add4(m->colors, watercolor);
-        if(b.y > tscale*sealevel) add4(m->colors, stonecolor);
-        else add4(m->colors, watercolor);
+        /*
+        if(d.y <= tscale*sealevel) add4(m->colors, watercolor);
+        else if(n2.y < steepness) add4(m->colors, stonecolor);
+        else add4(m->colors, earthcolor);
+        if(c.y <= tscale*sealevel) add4(m->colors, watercolor);
+        else if(n2.y < steepness) add4(m->colors, stonecolor);
+        else add4(m->colors, earthcolor);
+        if(b.y <= tscale*sealevel) add4(m->colors, watercolor);
+        else if(n2.y < steepness) add4(m->colors, stonecolor);
+        else add4(m->colors, earthcolor);
+        */
+
+        stonecolor = mix(stonecolor, earthcolor, 2*n2.y-1);
+        if(d.y <= tscale*sealevel) add4(m->colors, watercolor);
+        else add4(m->colors, stonecolor);
+        if(c.y <= tscale*sealevel) add4(m->colors, watercolor);
+        else add4(m->colors, stonecolor);
+        if(b.y <= tscale*sealevel) add4(m->colors, watercolor);
+        else add4(m->colors, stonecolor);
       }
-
-      glm::vec3 n2 = -1.0f*glm::normalize(glm::cross(d-c, b-c));
-      for(int i = 0; i < 3; i++)
-        add3(m->normals, n2);
-
 
     }
   }

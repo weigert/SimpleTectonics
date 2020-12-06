@@ -33,6 +33,8 @@ int cascade(int p, int n){
   int diff = n - p;
   int excess = int(abs(diff)/2.0f)-maxdiff;
 
+  if(abs(diff) < maxdiff) return diff/3;
+
   if(diff == 0) return 0;
   if(diff > 0) return min(excess,n);
   if(diff < 0) return -min(excess,p);
@@ -51,10 +53,6 @@ vec3 diffuse(){
       a += cascade(c, num(textureOffset(map, p, ivec2(-1, 0)).xyz) + int(k*h[index(textureOffset(cluster, p, ivec2(-1, 0)).xyz)]));
       a += cascade(c, num(textureOffset(map, p, ivec2( 0, 1)).xyz) + int(k*h[index(textureOffset(cluster, p, ivec2( 0, 1)).xyz)]));
       a += cascade(c, num(textureOffset(map, p, ivec2( 0,-1)).xyz) + int(k*h[index(textureOffset(cluster, p, ivec2( 0,-1)).xyz)]));
-  //    a += cascade(c, num(textureOffset(map, p, ivec2(-1,-1)).xyz) + int(k*h[index(textureOffset(cluster, p, ivec2(-1,-1)).xyz)]));
-  //    a += cascade(c, num(textureOffset(map, p, ivec2( 1,-1)).xyz) + int(k*h[index(textureOffset(cluster, p, ivec2( 1,-1)).xyz)]));
-  //    a += cascade(c, num(textureOffset(map, p, ivec2(-1, 1)).xyz) + int(k*h[index(textureOffset(cluster, p, ivec2(-1, 1)).xyz)]));
-  //    a += cascade(c, num(textureOffset(map, p, ivec2( 1, 1)).xyz) + int(k*h[index(textureOffset(cluster, p, ivec2( 1, 1)).xyz)]));
 
   //Return the Colorized Version
   return col(int(c+0.25*a));
