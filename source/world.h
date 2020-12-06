@@ -36,7 +36,7 @@ public:
     std::cout<<"SEED: "<<SEED<<std::endl;
 
     perlin.SetOctaveCount(8);
-    perlin.SetFrequency(1.0);
+    perlin.SetFrequency(2.0);
     perlin.SetPersistence(0.5);
 
     initialize();

@@ -5,7 +5,7 @@ out vec4 fragColor;
 uniform sampler2D map;
 uniform sampler2D cluster;
 
-const int maxdiff = 10000;
+const int maxdiff = 25000;
 
 layout (std430, binding = 0) buffer height {
   float h[];
@@ -51,13 +51,13 @@ vec3 diffuse(){
       a += cascade(c, num(textureOffset(map, p, ivec2(-1, 0)).xyz) + int(k*h[index(textureOffset(cluster, p, ivec2(-1, 0)).xyz)]));
       a += cascade(c, num(textureOffset(map, p, ivec2( 0, 1)).xyz) + int(k*h[index(textureOffset(cluster, p, ivec2( 0, 1)).xyz)]));
       a += cascade(c, num(textureOffset(map, p, ivec2( 0,-1)).xyz) + int(k*h[index(textureOffset(cluster, p, ivec2( 0,-1)).xyz)]));
-      a += cascade(c, num(textureOffset(map, p, ivec2(-1,-1)).xyz) + int(k*h[index(textureOffset(cluster, p, ivec2(-1,-1)).xyz)]));
-      a += cascade(c, num(textureOffset(map, p, ivec2( 1,-1)).xyz) + int(k*h[index(textureOffset(cluster, p, ivec2( 1,-1)).xyz)]));
-      a += cascade(c, num(textureOffset(map, p, ivec2(-1, 1)).xyz) + int(k*h[index(textureOffset(cluster, p, ivec2(-1, 1)).xyz)]));
-      a += cascade(c, num(textureOffset(map, p, ivec2( 1, 1)).xyz) + int(k*h[index(textureOffset(cluster, p, ivec2( 1, 1)).xyz)]));
+  //    a += cascade(c, num(textureOffset(map, p, ivec2(-1,-1)).xyz) + int(k*h[index(textureOffset(cluster, p, ivec2(-1,-1)).xyz)]));
+  //    a += cascade(c, num(textureOffset(map, p, ivec2( 1,-1)).xyz) + int(k*h[index(textureOffset(cluster, p, ivec2( 1,-1)).xyz)]));
+  //    a += cascade(c, num(textureOffset(map, p, ivec2(-1, 1)).xyz) + int(k*h[index(textureOffset(cluster, p, ivec2(-1, 1)).xyz)]));
+  //    a += cascade(c, num(textureOffset(map, p, ivec2( 1, 1)).xyz) + int(k*h[index(textureOffset(cluster, p, ivec2( 1, 1)).xyz)]));
 
   //Return the Colorized Version
-  return col(int(c+0.05*a));
+  return col(int(c+0.25*a));
 }
 
 void main(){
