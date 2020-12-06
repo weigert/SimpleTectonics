@@ -3,14 +3,12 @@ in vec2 ex_Tex;
 out vec4 fragColor;
 
 uniform sampler2D map;
+uniform sampler2D cluster;
 
-vec3 black = vec3(0.0, 0.0, 0.0);
-vec3 white = vec3(1.0, 1.0, 1.0);
+const int maxdiff = 10000;
 
-const float maxdiff = 0.0;
-
-layout (std430, binding = 0) buffer speed {
-  vec2 v[];
+layout (std430, binding = 0) buffer height {
+  float h[];
 };
 
 int index(vec3 a){
@@ -33,7 +31,7 @@ vec3 col(int i){
 int cascade(int p, int n){
 
   int diff = n - p;
-  int excess = int(abs(diff)/2.0f)-250000;
+  int excess = int(abs(diff)/2.0f)-maxdiff;
 
   if(diff == 0) return 0;
   if(diff > 0) return min(excess,n);
@@ -44,18 +42,19 @@ int cascade(int p, int n){
 vec3 diffuse(){
 
   vec2 p = ex_Tex; //Scale
+  int k = 0*256*256;
 
   //Get the value at Position
-  int c = num(textureOffset(map, p, ivec2(0,0)).xyz);
+  int c = num(textureOffset(map, p, ivec2(0,0)).xyz) + int(k*h[index(textureOffset(cluster, p, ivec2( 0, 0)).xyz)]);
 
-  int a  = cascade(c, num(textureOffset(map, p, ivec2( 1, 0)).xyz));
-      a += cascade(c, num(textureOffset(map, p, ivec2(-1, 0)).xyz));
-      a += cascade(c, num(textureOffset(map, p, ivec2( 0, 1)).xyz));
-      a += cascade(c, num(textureOffset(map, p, ivec2( 0,-1)).xyz));
-      a += cascade(c, num(textureOffset(map, p, ivec2(-1,-1)).xyz));
-      a += cascade(c, num(textureOffset(map, p, ivec2( 1,-1)).xyz));
-      a += cascade(c, num(textureOffset(map, p, ivec2(-1, 1)).xyz));
-      a += cascade(c, num(textureOffset(map, p, ivec2( 1, 1)).xyz));
+  int a  = cascade(c, num(textureOffset(map, p, ivec2( 1, 0)).xyz) + int(k*h[index(textureOffset(cluster, p, ivec2( 0, 0)).xyz)]));
+      a += cascade(c, num(textureOffset(map, p, ivec2(-1, 0)).xyz) + int(k*h[index(textureOffset(cluster, p, ivec2(-1, 0)).xyz)]));
+      a += cascade(c, num(textureOffset(map, p, ivec2( 0, 1)).xyz) + int(k*h[index(textureOffset(cluster, p, ivec2( 0, 1)).xyz)]));
+      a += cascade(c, num(textureOffset(map, p, ivec2( 0,-1)).xyz) + int(k*h[index(textureOffset(cluster, p, ivec2( 0,-1)).xyz)]));
+      a += cascade(c, num(textureOffset(map, p, ivec2(-1,-1)).xyz) + int(k*h[index(textureOffset(cluster, p, ivec2(-1,-1)).xyz)]));
+      a += cascade(c, num(textureOffset(map, p, ivec2( 1,-1)).xyz) + int(k*h[index(textureOffset(cluster, p, ivec2( 1,-1)).xyz)]));
+      a += cascade(c, num(textureOffset(map, p, ivec2(-1, 1)).xyz) + int(k*h[index(textureOffset(cluster, p, ivec2(-1, 1)).xyz)]));
+      a += cascade(c, num(textureOffset(map, p, ivec2( 1, 1)).xyz) + int(k*h[index(textureOffset(cluster, p, ivec2( 1, 1)).xyz)]));
 
   //Return the Colorized Version
   return col(int(c+0.05*a));

@@ -34,7 +34,7 @@ int main( int argc, char* args[] ) {
 	Shader voronoi({"source/shader/voronoi.vs", "source/shader/voronoi.fs"}, {"in_Quad", "in_Tex", "in_Centroid"});
 
 	Shader diffusion({"source/shader/flat.vs", "source/shader/diffusion.fs"}, {"in_Quad", "in_Tex"});
-	Shader cascading({"source/shader/flat.vs", "source/shader/cascade.fs"}, {"in_Quad", "in_Tex"});
+	Shader cascading({"source/shader/flat.vs", "source/shader/cascade.fs"}, {"in_Quad", "in_Tex"}, {"height"});
 	Shader subduction({"source/shader/flat.vs", "source/shader/subduction.fs"}, {"in_Quad", "in_Tex"}, {"colliding"});
 	Shader convection({"source/shader/flat.vs", "source/shader/convection.fs"}, {"in_Quad", "in_Tex"}, {"speed"});
 

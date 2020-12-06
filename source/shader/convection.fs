@@ -69,7 +69,7 @@ vec3 convect(){
   diff -= abs(int(s.x*c));
   diff -= abs(int(s.y*c));
 
-  return col(int(c + 0.08*diff));
+  return col(int(c + 0.01*diff));
 
 /*
   //Position, Height, Speed
