@@ -17,12 +17,173 @@ double angle(glm::vec2 d){
 
 }
 
-#include "plate.h"
+/*
+================================================================================
+                Individual Segments and Collections (Plates)
+================================================================================
+*/
+
+struct Litho : Segment {
+
+	Litho(vec2* p):Segment(p){}    //Constructor
+
+  float density = 0.5f;
+  float thickness = 0.1f;
+  float height = 0.0f;
+  float growth = 0.0f;
+
+};
+
+struct Plate {
+
+  Plate(vec2 p):pos{p}{}
+
+  vector<Litho*> seg;
+
+  vec2 pos;
+  vec2 speed = vec2(0);
+  float rotation = 0.0f;
+  float angveloc = 0.0f;
+  float mass = 0.0f;
+  float inertia = 0.0f;
+
+  //Parameters
+  float convection = 150.0f;
+  float growth = 0.01f;
+
+  void recenter(){
+
+    pos = vec2(0);
+    for(auto&s: seg){
+      pos     += *s->pos;
+      mass    += s->density*s->thickness;
+      inertia += pow(length(pos-*(s->pos)),2)*(s->density*s->thickness);
+    }
+    pos /= (float)seg.size();
+
+  }
+  void update(Cluster<Litho>& clus, double* hm);
+
+};
+
+void Plate::update(Cluster<Litho>& cluster, double* hm){
+
+  //Collide
+
+  for(auto&s: seg){
+
+    int csind = cluster.sample(*(s->pos));
+
+    const int n = 12;
+    for(int j = 0; j < n; j++){
+
+      vec2 scan = *(s->pos);
+      scan += SIZE*R/12.0f*vec2(cos((float)j/(float)n*2.0f*PI), sin((float)j/(float)n*2.0f*PI));
+
+      if( scan.x >= SIZE || scan.x < 0 ||
+          scan.y >= SIZE || scan.y < 0) continue;
+
+      int segind = cluster.sample(scan);
+
+      if(segind < 0) continue;        //Non-Index (Blank Space)
+      if(segind == csind) continue;   //Same Segment
+
+      //Add Torque
+
+      s->alive = false;               //Collision
+      break;
+
+    }
+  }
+
+  //Grow
+
+  for(auto&s: seg){
+
+    if(!s->alive) continue;
+
+    float G = growth*(1.0f-s->thickness);
+    ivec2 ip = *(s->pos);
+
+    float nd = 1.0f-hm[ip.y+ip.x*SIZE]; //Hotter = Less Dense
+
+    s->density = s->density*(s->thickness+nd*G/s->density)/(G+s->thickness);
+    s->thickness += G;
+
+    s->growth = s->thickness*(1-s->density) - s->height;
+    s->height = s->thickness*(1-s->density);
+
+  }
+
+  //Convect
+
+  vec2 acc = vec2(0);
+  float torque = 0.0f;
+
+  const function<vec2(ivec2, double*)> force = [](ivec2 i, double* ff){
+
+    float fx, fy = 0.0f;
+
+    if(i.x > 0 && i.x < SIZE-1 && i.y > 0 && i.y < SIZE-1){
+      fx = -(ff[(i.x+1)*SIZE+i.y] - ff[(i.x-1)*SIZE+i.y])/2.0f;
+      fy = -(ff[i.x*SIZE+i.y+1] - ff[i.x*SIZE+i.y-1])/2.0f;
+    }
+
+    if(i.x <= 0) fx = 0.1f;
+    else if(i.x >= SIZE-1) fx = -0.1f;
+
+    if(i.y <= 0) fy = 0.1;
+    else if(i.y >= SIZE-1) fy = -0.1f;
+
+    return vec2(fx,fy);
+
+  };
+
+  for(auto&s: seg){
+
+    vec2 f = force(*(s->pos), hm);
+    vec2 dir = *(s->pos)-pos;
+
+    acc += convection*f;
+    torque += convection*length(dir)*length(f)*sin(angle(f)-angle(dir));
+
+  }
+
+  speed    += DT*acc/mass;
+  angveloc += DT*torque/inertia;
+  pos      += DT*speed;
+  rotation += DT*angveloc;
+
+  if(rotation > 2*PI) rotation -= 2*PI;
+  if(rotation < 0) rotation += 2*PI;
+
+  for(auto&s: seg){
+
+    vec2 dir = *(s->pos) - (pos - DT*speed);
+    float _angle = angle(dir) -  (rotation - DT*angveloc);
+
+    s->speed = (pos + length(dir)*vec2(cos(rotation+_angle),sin(rotation+_angle)))-*(s->pos);
+    *(s->pos) = pos + length(dir)*vec2(cos(rotation+_angle),sin(rotation+_angle));
+
+  }
+
+  //Cleanup
+
+  bool erased = false;
+  for(int j = 0; j < seg.size(); j++)
+    if(!seg[j]->alive){
+      seg.erase(seg.begin()+j);
+      j--;
+      erased = true;
+    }
+  if(erased) recenter();
+
+}
 
 /*
-==================================================
-              Main World Container
-==================================================
+================================================================================
+                          Main World Container
+================================================================================
 */
 
 class World {
@@ -39,51 +200,42 @@ public:
     perlin.SetFrequency(2.0);
     perlin.SetPersistence(0.5);
 
+    heatmap = new double[SIZE*SIZE];
+    heightmap = new double[SIZE*SIZE];
+    tmpmap = new int[SIZE*SIZE];
+
     initialize();
 
-    clustering = new Billboard(SIZE, SIZE);
     depthmap = new Billboard(SIZE, SIZE);
-    heightA = new Billboard(SIZE, SIZE);
-    heightB = new Billboard(SIZE, SIZE);
 
   }
 
   ~World(){
-    delete clustering;
+
+    delete[] heatmap;
+    delete[] heightmap;
+    delete[] tmpmap;
+
     delete depthmap;
     delete heatA;
     delete heatB;
     delete heightA;
     delete heightB;
 
-    for(int i = 0; i < segments.size(); i++)
-      delete segments[i];
-
-    delete[] clustermap;
-    delete[] heatmap;
-    delete[] heightmap;
-    delete[] tmpmap;
-
   }
 
-  //General Information
   int SEED = 0;
   const glm::vec2 dim = glm::vec2(SIZE, SIZE);
   const float scale = 25.0f;
   noise::module::Perlin perlin;
-  float dt = 0.02f;
 
-  double* heatmap;
+  vector<Plate> plates;     //Plate Storage
+  Cluster<Litho> cluster;   //Cluster Object
+
+  double* heatmap;          //Additional Data
   double* heightmap;
-  int* clustermap;
   int* tmpmap;
 
-  //Plate Centroids
-  vector<vec2> centroids;  //Raw Position Buffer
-  vector<Segment*> segments; //Segment Pointer Buffer
-  vector<Plate> plates;        //Additional Data
-
-  Billboard* clustering;
   Billboard* depthmap;
   Billboard* heatA;
   Billboard* heatB;
@@ -91,23 +243,23 @@ public:
   Billboard* heightB;
 
   void initialize();
+  void update();
 
-  void cluster(Shader* voronoi, Instance* inst);
   void subduct(Shader* diffusion, Shader* subduction, Square2D* flat, int n);
-  void sediment(Shader* diffusoin, Shader* sedimentation, Square2D* flat, int n);
-
-  void update(Instance* inst);
+  void sediment(Shader* convection, Shader* cascasding, Square2D* flat, int n);
 
 };
 
+/*
+================================================================================
+                        Initialization and Updating
+================================================================================
+*/
+
 void World::initialize(){
 
-  heatmap = new double[SIZE*SIZE];
-  clustermap = new int[SIZE*SIZE];
-  heightmap = new double[SIZE*SIZE];
-  tmpmap = new int[SIZE*SIZE];
+  //Initialize Heatmap
 
-  //Generate Randomized Heat Map
   float min = 1.0;
   float max = -1.0;
   for(unsigned int i = 0; i < SIZE; i++){
@@ -118,14 +270,16 @@ void World::initialize(){
     }
   }
 
-  //Normalize Heatmap
   for(int i = 0; i < SIZE; i++)
     for(int j = 0; j < SIZE; j++)
-    //  heatmap[j+i*SIZE] = length(vec2(i-SIZE/2,j-SIZE/2))/255;
       heatmap[j+i*SIZE] = (heatmap[j+i*SIZE] - min)/(max-min);
 
- for(unsigned int i = 0; i < SIZE*SIZE; i++)
+  //Initialize Heightmap
+
+  for(unsigned int i = 0; i < SIZE*SIZE; i++)
     heightmap[i] = 0.31;
+
+  ////Initialize
 
   //Construct a billboard, using a texture generated from the raw data
   heatA = new Billboard(image::make([&](int i){
@@ -137,179 +291,51 @@ void World::initialize(){
 
   //Construct a billboard, using a texture generated from the raw data
   heightA = new Billboard(image::make([&](int i){
-    return mix(vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 1.0, 1.0, 1.0), heatmap[i]);
+    return mix(vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 1.0, 1.0, 1.0), heightmap[i]);
   }, vec2(SIZE, SIZE)));
   heightB = new Billboard(image::make([&](int i){
-    return mix(vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 1.0, 1.0, 1.0), heatmap[i]);
+    return mix(vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 1.0, 1.0, 1.0), heightmap[i]);
   }, vec2(SIZE, SIZE)));
 
   //Generate Plates
   for(int i = 0; i < nplates; i++)
     plates.emplace_back(Plate(vec2(rand()%SIZE,rand()%SIZE)));
 
-  //Generate Plate Centroids
-  sample::disc(centroids, K, glm::vec2(0), glm::vec2(256));
-
-  //Create Relevant Segments
-  for(auto&c: centroids){
-
-    Segment* newseg = new Segment(&c); //Properly Scaled Position
-    segments.push_back(newseg);
+  //Create Relevant clus.segs
+  for(auto s: cluster.segs){
 
     float dist = SIZE*SIZE;
     Plate* nearest;
 
     for(auto&p: plates){
-
-      if( glm::length(p.pos-c) < dist ){
-        dist = glm::length(p.pos-c);
+      if( glm::length(p.pos-*(s->pos)) < dist ){
+        dist = glm::length(p.pos-*(s->pos));
         nearest = &p;
       }
-
     }
-
-    nearest->seg.push_back(newseg);
+    nearest->seg.push_back(s);
 
   }
 
-  for(auto&p: plates) p.recenter();
+  for(auto&p: plates)
+    p.recenter();
 
 }
 
-/*
-================================================================================
-                            Plate Dynamics
-================================================================================
-*/
+void World::update(){
 
-void World::cluster(Shader* voronoi, Instance* inst){
-
-  clustering->target(vec3(1));
-  voronoi->use();
-  voronoi->uniform("R", R);
-  voronoi->uniform("depthmap", false);
-  inst->render();
-
-  clustering->sample<int>(clustermap, vec2(0), dim, GL_COLOR_ATTACHMENT0, GL_RGBA);
-
-}
-
-void World::subduct(Shader* diffusion, Shader* subduction, Square2D* flat, int n){
-
-  vector<int> colliding;
-  for(int i = 0; i < segments.size(); i++){
-    if(segments[i]->colliding) colliding.push_back(1);
-    else colliding.push_back(0);
-  }
-  subduction->buffer("colliding", colliding);
-
-  for(int i = 0; i < n; i++){
-
-    heatB->target(false); //No-Clear Target
-    diffusion->use();
-    diffusion->uniform("D", 0.2f);
-    diffusion->uniform("model", mat4(1));
-    diffusion->texture("map", heatA->texture);
-    flat->render();
-
-    heatA->target(false); //No-Clear Target
-    subduction->use();
-    subduction->uniform("model", mat4(1));
-    subduction->texture("map", heatB->texture);
-    subduction->texture("cluster", clustering->texture);
-    flat->render();
-
-  }
-
-  //Sample heatA into tmpmap
-  heatA->sample<int>(tmpmap, vec2(0), dim, GL_COLOR_ATTACHMENT0, GL_RGBA);
-  for(int i = 0; i < dim.x*dim.y; i++)
-    heatmap[i] = color::i2rgba(tmpmap[i]).r/255.0f;
-
-}
-
-void World::sediment(Shader* convection, Shader* cascading, Square2D* flat, int n){
-
-  std::vector<vec2> speed;
-  std::vector<float> height;
-  for(int i = 0; i < segments.size(); i++){
-    speed.push_back(segments[i]->speed);
-    height.push_back(segments[i]->height);
-  }
-  cascading->buffer("height", height);
-  convection->buffer("speed", speed);
-
-  for(int i = 0; i < n; i++){
-
-    heightB->target(false); //No-Clear Target
-    convection->use();
-    convection->uniform("model", mat4(1));
-    convection->texture("map", heightA->texture);
-    convection->texture("cluster", clustering->texture);
-    flat->render();
-
-    heightA->target(false); //No-Clear Target
-    cascading->use();
-    cascading->uniform("model", mat4(1));
-    cascading->texture("map", heightB->texture);
-    cascading->texture("cluster", clustering->texture);
-    flat->render();
-
-  }
-
-  //Add Sedimentation Offset to Heightmap
-  heightA->sample<int>(tmpmap, vec2(0), dim, GL_COLOR_ATTACHMENT0, GL_RGBA);
-  vec4 col;
-  for(int i = 0; i < dim.x*dim.y; i++){
-    col = color::i2rgba(tmpmap[i])/255.0f/255.0f/255.0f;
-    heightmap[i] = (col.x+col.y*256+col.z*256*256);
-  }
-
-}
-
-/*
-================================================================================
-                            Add / Remove Centroids
-================================================================================
-*/
-
-void World::update(Instance* inst){
+  // Remove Empty Plates
 
   for(int i = 0; i < plates.size(); i++){
-
-    //Remove Empty Plates
     if(plates[i].seg.size() == 0){
       plates.erase(plates.begin()+i);
       i--;
       continue;
     }
-
-    //Remove Colliding Segment References
-    bool erased = false;
-    for(int j = 0; j < plates[i].seg.size(); j++){
-      if(plates[i].seg[j]->colliding){
-        plates[i].seg.erase(plates[i].seg.begin()+j);
-        j--;
-        erased = true;
-      }
-    }
-    if(erased) plates[i].recenter();
-
   }
 
-  //Remove Colliding Segments
-  for(int i = 0; i < segments.size(); i++){
-    if(segments[i]->colliding){
-      centroids.erase(centroids.begin()+i);
-      delete segments[i];
-      segments.erase(segments.begin()+i);
-      i--;
-    }
-  }
-  for(int i = 0; i < segments.size(); i++)
-    segments[i]->pos = &centroids[i];
+  // Fill Gaps
 
-  //Add New Segments in Empty Regions
   for(auto&p: plates){
 
     for(auto&s: p.seg){
@@ -323,19 +349,13 @@ void World::update(Instance* inst){
 
       //Compute Color at Scan
       //Index of the current guy in general
-      int cmind = (int)scan.y*SIZE+(int)scan.x;
-      vec4 col = color::i2rgba(clustermap[cmind]);
+      int csind = cluster.sample(scan);
+      if(csind < 0){
 
-      if(col == vec4(255)){
-
-        centroids.push_back(scan);
-      	Segment* newseg = new Segment(&centroids.back()); //Properly Scaled Position
-      	segments.push_back(newseg);
-      	p.seg.push_back(newseg);
+        cluster.points.push_back(scan);
+        p.seg.push_back(cluster.add(cluster.points.back()));
+        cluster.reassign();
         p.recenter();
-
-        for(int i = 0; i < segments.size(); i++)
-          segments[i]->pos = &centroids[i];
 
         break;
 
@@ -343,165 +363,104 @@ void World::update(Instance* inst){
     }
   }
 
-  inst->updateBuffer(centroids, 0);
+  cluster.update();
 
 }
 
 /*
 ================================================================================
-                                  Rendering
+                            Surface Level Effects
 ================================================================================
 */
 
-std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
+void World::subduct(Shader* diffusion, Shader* subduction, Square2D* flat, int n){
 
-  m->indices.clear();
-  m->positions.clear();
-  m->normals.clear();
-  m->colors.clear();
+  //Prepare Buffers
 
-  //Loop over all positions and add the triangles!
-  for(int i = 0; i < w->dim.x-1; i++){
-    for(int j = 0; j < w->dim.y-1; j++){
-
-      //Get Index
-      int ind = i*w->dim.y+j;
-
-      glm::vec4 col = color::i2rgba(w->clustermap[(int)(i*w->dim.y+j)]);
-      int aind = col.x + col.y*256 + col.z*256*256;
-      col = color::i2rgba(w->clustermap[(int)(i*w->dim.y+j+1)]);
-      int bind = col.x + col.y*256 + col.z*256*256;
-      col = color::i2rgba(w->clustermap[(int)((i+1)*w->dim.y+j)]);
-      int cind = col.x + col.y*256 + col.z*256*256;
-      col = color::i2rgba(w->clustermap[(int)((i+1)*w->dim.y+j+1)]);
-      int dind = col.x + col.y*256 + col.z*256*256;
-
-      //Add to Position Vector
-      glm::vec3 a, b, c, d;
-
-      a = glm::vec3(i  , 0.0, j  );
-      b = glm::vec3(i  , 0.0, j+1);
-      c = glm::vec3(i+1, 0.0, j  );
-      d = glm::vec3(i+1, 0.0, j+1);
-
-      float tscale = 150.0f;
-
-      if(viewplates){
-        if( aind < w->centroids.size() )
-          a += glm::vec3(0, w->scale*w->segments[aind]->height, 0);
-        if( bind < w->centroids.size() )
-          b += glm::vec3(0, w->scale*w->segments[bind]->height, 0);
-        if( cind < w->centroids.size() )
-          c += glm::vec3(0, w->scale*w->segments[cind]->height, 0);
-        if( dind < w->centroids.size() )
-          d += glm::vec3(0, w->scale*w->segments[dind]->height, 0);
-      }
-      if(!viewplates){
-
-        a += glm::vec3(0, tscale*(w->heightmap[i*(int)w->dim.y+j]), 0);
-        b += glm::vec3(0, tscale*(w->heightmap[i*(int)w->dim.y+j+1]), 0);
-        c += glm::vec3(0, tscale*(w->heightmap[(i+1)*(int)w->dim.y+j]), 0);
-        d += glm::vec3(0, tscale*(w->heightmap[(i+1)*(int)w->dim.y+j+1]), 0);
-
-        if(a.y < tscale*sealevel) a.y = tscale*sealevel;
-        if(b.y < tscale*sealevel) b.y = tscale*sealevel;
-        if(c.y < tscale*sealevel) c.y = tscale*sealevel;
-        if(d.y < tscale*sealevel) d.y = tscale*sealevel;
-
-      }
-
-      //UPPER TRIANGLE
-
-      //Add Indices
-      m->indices.push_back(m->positions.size()/3+0);
-      m->indices.push_back(m->positions.size()/3+1);
-      m->indices.push_back(m->positions.size()/3+2);
-
-      m->add(m->positions,a);
-      m->add(m->positions,b);
-      m->add(m->positions,c);
-      glm::vec3 n1 = -1.0f*glm::normalize(glm::cross(a-b, c-b));
-      for(int i = 0; i < 3; i++)
-        m->add(m->normals,n1);
-
-      vec4 tmpcol;
-
-      if(viewplates){
-        if(aind < w->segments.size()){
-          tmpcol = mix(magmacolor, collidecolor, w->segments[aind]->thickness);
-          m->add(m->colors,tmpcol);
-        }
-        else m->add(m->colors,magmacolor);
-
-        if(bind < w->segments.size()){
-          tmpcol = mix(magmacolor, collidecolor, w->segments[bind]->thickness);
-          m->add(m->colors,tmpcol);
-        }
-        else m->add(m->colors,magmacolor);
-
-        if(cind < w->segments.size()){
-          tmpcol = mix(magmacolor, collidecolor, w->segments[cind]->thickness);
-          m->add(m->colors,tmpcol);
-        }
-        else m->add(m->colors,magmacolor);
-      }
-      else{
-        if(a.y == tscale*sealevel) m->add(m->colors, watercolor);
-        else if(n1.y > steepness) m->add(m->colors, earthcolor);
-        else m->add(m->colors, stonecolor);
-        if(b.y == tscale*sealevel) m->add(m->colors, watercolor);
-        else if(n1.y > steepness) m->add(m->colors, earthcolor);
-        else m->add(m->colors, stonecolor);
-        if(c.y == tscale*sealevel) m->add(m->colors, watercolor);
-        else if(n1.y > steepness) m->add(m->colors, earthcolor);
-        else m->add(m->colors, stonecolor);
-      }
-
-      m->indices.push_back(m->positions.size()/3+0);
-      m->indices.push_back(m->positions.size()/3+1);
-      m->indices.push_back(m->positions.size()/3+2);
-
-      m->add(m->positions,d);
-      m->add(m->positions,c);
-      m->add(m->positions,b);
-      glm::vec3 n2 = -1.0f*glm::normalize(glm::cross(d-c, b-c));
-      for(int i = 0; i < 3; i++)
-        m->add(m->normals, n2);
-
-      if(viewplates){
-        if(dind < w->segments.size()){
-          tmpcol = mix(magmacolor, collidecolor, w->segments[dind]->thickness);
-          m->add(m->colors,tmpcol);
-        }
-        else m->add(m->colors,magmacolor);
-
-
-        if(cind < w->segments.size()){
-          tmpcol = mix(magmacolor, collidecolor, w->segments[cind]->thickness);
-          m->add(m->colors,tmpcol);
-        }
-        else m->add(m->colors,magmacolor);
-
-
-        if(bind < w->segments.size()){
-          tmpcol = mix(magmacolor, collidecolor, w->segments[bind]->thickness);
-          m->add(m->colors,tmpcol);
-        }
-        else m->add(m->colors,magmacolor);
-      }
-      else{
-        if(d.y == tscale*sealevel) m->add(m->colors, watercolor);
-        else if(n2.y > steepness) m->add(m->colors, earthcolor);
-        else m->add(m->colors, stonecolor);
-        if(c.y == tscale*sealevel) m->add(m->colors, watercolor);
-        else if(n2.y > steepness) m->add(m->colors, earthcolor);
-        else m->add(m->colors, stonecolor);
-        if(b.y == tscale*sealevel) m->add(m->colors, watercolor);
-        else if(n2.y > steepness) m->add(m->colors, earthcolor);
-        else m->add(m->colors, stonecolor);
-      }
-
-    }
+  vector<int> colliding;
+  for(int i = 0; i < cluster.segs.size(); i++){
+    if(!cluster.segs[i]->alive) colliding.push_back(1);
+    else colliding.push_back(0);
   }
 
-};
+  //Add SSBO to Shader
+
+  subduction->buffer("colliding", colliding);
+
+  //Execute Alternating Render Pass
+
+  for(int i = 0; i < n; i++){
+
+    heatB->target(false); //No-Clear Target
+    diffusion->use();
+    diffusion->uniform("D", 0.1f);
+    diffusion->uniform("model", mat4(1));
+    diffusion->texture("map", heatA->texture);
+    flat->render();
+
+    heatA->target(false); //No-Clear Target
+    subduction->use();
+    subduction->uniform("model", mat4(1));
+    subduction->texture("map", heatB->texture);
+    subduction->texture("cluster", cluster.target->texture);
+    flat->render();
+
+  }
+
+  //Sample heatA into tmpmap
+
+  heatA->sample<int>(tmpmap, vec2(0), dim, GL_COLOR_ATTACHMENT0, GL_RGBA);
+  for(int i = 0; i < dim.x*dim.y; i++)
+    heatmap[i] = color::i2rgba(tmpmap[i]).r/255.0f;
+
+}
+
+void World::sediment(Shader* convection, Shader* cascading, Square2D* flat, int n){
+
+  //Prepare Buffers
+
+  std::vector<vec2> speed;
+  std::vector<float> height;
+  std::vector<int> alive;
+  for(int i = 0; i < cluster.segs.size(); i++){
+    speed.push_back(cluster.segs[i]->speed);
+    height.push_back(cluster.segs[i]->height);
+    alive.push_back(cluster.segs[i]->alive);
+  }
+
+  //Add SSBO to Shader
+
+  cascading->buffer("height", height);
+  convection->buffer("speed", speed);
+  convection->buffer("alive", alive);
+
+  //Execute Alternating Render Pass
+
+  for(int i = 0; i < n; i++){
+
+    heightB->target(false); //No-Clear Target
+    convection->use();
+    convection->uniform("model", mat4(1));
+    convection->texture("map", heightA->texture);
+    convection->texture("cluster", cluster.target->texture);
+    flat->render();
+
+    heightA->target(false); //No-Clear Target
+    cascading->use();
+    cascading->uniform("model", mat4(1));
+    cascading->texture("map", heightB->texture);
+    cascading->texture("cluster", cluster.target->texture);
+    flat->render();
+
+  }
+
+  //Add Sedimentation Offset to Heightmap
+
+  heightA->sample<int>(tmpmap, vec2(0), dim, GL_COLOR_ATTACHMENT0, GL_RGBA);
+  vec4 col;
+  for(int i = 0; i < dim.x*dim.y; i++){
+    col = color::i2rgba(tmpmap[i])/255.0f/255.0f/255.0f;
+    heightmap[i] = (col.x+col.y*256+col.z*256*256);
+  }
+
+}

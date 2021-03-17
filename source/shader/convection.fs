@@ -10,6 +10,10 @@ layout (std430, binding = 0) buffer speed {
   vec2 v[];
 };
 
+layout (std430, binding = 1) buffer alive {
+  int b[];
+};
+
 int num(vec3 a){
   a = a*255.0f;
   return int((a.x + a.y*256 + a.z*256*256));
@@ -26,7 +30,7 @@ vec3 convect(float rate){
 
   vec2 p = ex_Tex;                                                  //Position
   int c = num(textureOffset(map, p, ivec2( 0, 0)).xyz);             //Speed
-  vec2 s = v[num(textureOffset(cluster, p, ivec2( 0, 0)).xyz)];   //Height
+  vec2 s = v[num(textureOffset(cluster, p, ivec2( 0, 0)).xyz)];     //Height
 
   int cfx = num(textureOffset(map, p, ivec2( 0, 1)).xyz);
   int cbx = num(textureOffset(map, p, ivec2( 0,-1)).xyz);
@@ -48,6 +52,12 @@ vec3 convect(float rate){
   diff -= abs(int(s.x*c));                      //Self Distribution
   diff -= abs(int(s.y*c));
 
+/*
+  if(b[num(textureOffset(cluster, p, ivec2( 0, 0)).xyz)] == 0){
+    diff = 10000000;
+  }
+  //else diff = 0;
+*/
   return col(int(c + rate*diff));
 
 }

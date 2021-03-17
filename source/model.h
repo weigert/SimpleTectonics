@@ -139,3 +139,163 @@ std::function<void()> eventHandler = [](){
   }
 
 };
+
+
+/*
+================================================================================
+                                  Rendering
+================================================================================
+*/
+
+std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
+
+  m->indices.clear();
+  m->positions.clear();
+  m->normals.clear();
+  m->colors.clear();
+
+  //Loop over all positions and add the triangles!
+  for(int i = 0; i < w->dim.x-1; i++){
+    for(int j = 0; j < w->dim.y-1; j++){
+
+      //Get Index
+      int ind = i*w->dim.y+j;
+
+      glm::vec4 col = color::i2rgba(w->cluster.indexmap[(int)(i*w->dim.y+j)]);
+      int aind = col.x + col.y*256 + col.z*256*256;
+      col = color::i2rgba(w->cluster.indexmap[(int)(i*w->dim.y+j+1)]);
+      int bind = col.x + col.y*256 + col.z*256*256;
+      col = color::i2rgba(w->cluster.indexmap[(int)((i+1)*w->dim.y+j)]);
+      int cind = col.x + col.y*256 + col.z*256*256;
+      col = color::i2rgba(w->cluster.indexmap[(int)((i+1)*w->dim.y+j+1)]);
+      int dind = col.x + col.y*256 + col.z*256*256;
+
+      //Add to Position Vector
+      glm::vec3 a, b, c, d;
+
+      a = glm::vec3(i  , 0.0, j  );
+      b = glm::vec3(i  , 0.0, j+1);
+      c = glm::vec3(i+1, 0.0, j  );
+      d = glm::vec3(i+1, 0.0, j+1);
+
+      float tscale = 150.0f;
+
+      if(viewplates){
+        if( aind < w->cluster.points.size() )
+          a += glm::vec3(0, w->scale*w->cluster.segs[aind]->height, 0);
+        if( bind < w->cluster.points.size() )
+          b += glm::vec3(0, w->scale*w->cluster.segs[bind]->height, 0);
+        if( cind < w->cluster.points.size() )
+          c += glm::vec3(0, w->scale*w->cluster.segs[cind]->height, 0);
+        if( dind < w->cluster.points.size() )
+          d += glm::vec3(0, w->scale*w->cluster.segs[dind]->height, 0);
+      }
+      if(!viewplates){
+
+        a += glm::vec3(0, tscale*(w->heightmap[i*(int)w->dim.y+j]), 0);
+        b += glm::vec3(0, tscale*(w->heightmap[i*(int)w->dim.y+j+1]), 0);
+        c += glm::vec3(0, tscale*(w->heightmap[(i+1)*(int)w->dim.y+j]), 0);
+        d += glm::vec3(0, tscale*(w->heightmap[(i+1)*(int)w->dim.y+j+1]), 0);
+
+        if(a.y < tscale*sealevel) a.y = tscale*sealevel;
+        if(b.y < tscale*sealevel) b.y = tscale*sealevel;
+        if(c.y < tscale*sealevel) c.y = tscale*sealevel;
+        if(d.y < tscale*sealevel) d.y = tscale*sealevel;
+
+      }
+
+      //UPPER TRIANGLE
+
+      //Add Indices
+      m->indices.push_back(m->positions.size()/3+0);
+      m->indices.push_back(m->positions.size()/3+1);
+      m->indices.push_back(m->positions.size()/3+2);
+
+      m->add(m->positions,a);
+      m->add(m->positions,b);
+      m->add(m->positions,c);
+      glm::vec3 n1 = -1.0f*glm::normalize(glm::cross(a-b, c-b));
+      for(int i = 0; i < 3; i++)
+        m->add(m->normals,n1);
+
+      vec4 tmpcol;
+
+      if(viewplates){
+        if(aind < w->cluster.segs.size()){
+          tmpcol = mix(magmacolor, collidecolor, w->cluster.segs[aind]->thickness);
+          m->add(m->colors,tmpcol);
+        }
+        else m->add(m->colors,magmacolor);
+
+        if(bind < w->cluster.segs.size()){
+          tmpcol = mix(magmacolor, collidecolor, w->cluster.segs[bind]->thickness);
+          m->add(m->colors,tmpcol);
+        }
+        else m->add(m->colors,magmacolor);
+
+        if(cind < w->cluster.segs.size()){
+          tmpcol = mix(magmacolor, collidecolor, w->cluster.segs[cind]->thickness);
+          m->add(m->colors,tmpcol);
+        }
+        else m->add(m->colors,magmacolor);
+      }
+      else{
+        if(a.y == tscale*sealevel) m->add(m->colors, watercolor);
+        else if(n1.y > steepness) m->add(m->colors, earthcolor);
+        else m->add(m->colors, stonecolor);
+        if(b.y == tscale*sealevel) m->add(m->colors, watercolor);
+        else if(n1.y > steepness) m->add(m->colors, earthcolor);
+        else m->add(m->colors, stonecolor);
+        if(c.y == tscale*sealevel) m->add(m->colors, watercolor);
+        else if(n1.y > steepness) m->add(m->colors, earthcolor);
+        else m->add(m->colors, stonecolor);
+      }
+
+      m->indices.push_back(m->positions.size()/3+0);
+      m->indices.push_back(m->positions.size()/3+1);
+      m->indices.push_back(m->positions.size()/3+2);
+
+      m->add(m->positions,d);
+      m->add(m->positions,c);
+      m->add(m->positions,b);
+      glm::vec3 n2 = -1.0f*glm::normalize(glm::cross(d-c, b-c));
+      for(int i = 0; i < 3; i++)
+        m->add(m->normals, n2);
+
+      if(viewplates){
+        if(dind < w->cluster.segs.size()){
+          tmpcol = mix(magmacolor, collidecolor, w->cluster.segs[dind]->thickness);
+          m->add(m->colors,tmpcol);
+        }
+        else m->add(m->colors,magmacolor);
+
+
+        if(cind < w->cluster.segs.size()){
+          tmpcol = mix(magmacolor, collidecolor, w->cluster.segs[cind]->thickness);
+          m->add(m->colors,tmpcol);
+        }
+        else m->add(m->colors,magmacolor);
+
+
+        if(bind < w->cluster.segs.size()){
+          tmpcol = mix(magmacolor, collidecolor, w->cluster.segs[bind]->thickness);
+          m->add(m->colors,tmpcol);
+        }
+        else m->add(m->colors,magmacolor);
+      }
+      else{
+        if(d.y == tscale*sealevel) m->add(m->colors, watercolor);
+        else if(n2.y > steepness) m->add(m->colors, earthcolor);
+        else m->add(m->colors, stonecolor);
+        if(c.y == tscale*sealevel) m->add(m->colors, watercolor);
+        else if(n2.y > steepness) m->add(m->colors, earthcolor);
+        else m->add(m->colors, stonecolor);
+        if(b.y == tscale*sealevel) m->add(m->colors, watercolor);
+        else if(n2.y > steepness) m->add(m->colors, earthcolor);
+        else m->add(m->colors, stonecolor);
+      }
+
+    }
+  }
+
+};
