@@ -8,7 +8,7 @@ bool animate = false;
 bool viewmap = true;
 bool viewplates = true;
 
-float sealevel = 0.0;
+float sealevel = 0.32;
 float steepness = 0.95;
 
 float zoom = 0.2;
@@ -178,17 +178,17 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
       c = glm::vec3(i+1, 0.0, j  );
       d = glm::vec3(i+1, 0.0, j+1);
 
-      float tscale = 150.0f;
+      float tscale = 50.0f;
 
       if(viewplates){
         if( aind < w->cluster.points.size() )
-          a += glm::vec3(0, w->scale*w->cluster.segs[aind]->height, 0);
+          a += glm::vec3(0, w->scale*(w->cluster.segs[aind]->height + w->cluster.segs[aind]->plateheight), 0);
         if( bind < w->cluster.points.size() )
-          b += glm::vec3(0, w->scale*w->cluster.segs[bind]->height, 0);
+          b += glm::vec3(0, w->scale*(w->cluster.segs[bind]->height + w->cluster.segs[bind]->plateheight), 0);
         if( cind < w->cluster.points.size() )
-          c += glm::vec3(0, w->scale*w->cluster.segs[cind]->height, 0);
+          c += glm::vec3(0, w->scale*(w->cluster.segs[cind]->height + w->cluster.segs[cind]->plateheight), 0);
         if( dind < w->cluster.points.size() )
-          d += glm::vec3(0, w->scale*w->cluster.segs[dind]->height, 0);
+          d += glm::vec3(0, w->scale*(w->cluster.segs[dind]->height + w->cluster.segs[dind]->plateheight), 0);
       }
       if(!viewplates){
 

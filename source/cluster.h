@@ -34,25 +34,7 @@ Billboard* target;
 Shader* voronoi;
 
 void update(){
-
-  //Check for Out-Of-Bounds
-
-  for(auto&s: segs){
-    ivec2 ip = *(s->pos);
-    if(ip.x < -SIZE || ip.x > 2*SIZE-1 ||
-    ip.y < -SIZE || ip.y > 2*SIZE-1){
-      s->alive = false;
-    }
-  }
-
-  //Remove Dead Nodes
-
-  remove([](T* s){
-    return !s->alive;
-  });
-
-  reassign();
-
+  
   //Compute Index Map
 
   instance->updateBuffer(points, 0);

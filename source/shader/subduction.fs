@@ -24,11 +24,11 @@ void main(){
 
   //Plate Separation
   if(texture(cluster,ex_Tex) == vec4(1.0))
-    fragColor = mix(fragColor, cold, 0.2);
+    fragColor = mix(fragColor, cold, 0.1);
 
   //Plate Collision
   int i = index(texture(cluster, ex_Tex).rgb);
   if(c[i] == 1)
-    fragColor = mix(fragColor, warm, 0.2);
+    fragColor = mix(fragColor, warm, 0.4);
 
 }

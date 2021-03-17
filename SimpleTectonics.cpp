@@ -11,7 +11,7 @@
 
 #define SIZE 256
 #define nplates 24
-#define DT 0.02f
+#define DT 0.025f
 #define WIDTH 1000
 #define HEIGHT 1000
 const float R = 2.0f*sqrt(4.0f/3.14159265f/K);
@@ -43,7 +43,6 @@ int main( int argc, char* args[] ) {
 	Shader diffusion({"source/shader/flat.vs",  "source/shader/diffusion.fs"},  {"in_Quad", "in_Tex"});
 	Shader cascading({"source/shader/flat.vs",  "source/shader/cascading.fs"},  {"in_Quad", "in_Tex"}, {"height"});
 	Shader subduction({"source/shader/flat.vs", "source/shader/subduction.fs"}, {"in_Quad", "in_Tex"}, {"colliding"});
-	Shader convection({"source/shader/flat.vs", "source/shader/convection.fs"}, {"in_Quad", "in_Tex"}, {"speed", "alive"});
 
 	World world(SEED);
 	world.heightB->target(vec3(0.3));	//Sea-Level
@@ -144,7 +143,7 @@ int main( int argc, char* args[] ) {
 			//Compute Effect on Heat and Mass
 			world.subduct(&diffusion, &subduction, &flat, 25);
 
-			if(DOSEDIMENT) world.sediment(&convection, &cascading, &flat, 15);
+			if(DOSEDIMENT) world.sediment(&cascading, &flat, 25);
 
 			//Update the World
 			world.update();

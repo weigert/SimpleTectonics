@@ -32,6 +32,13 @@ struct Litho : Segment {
   float height = 0.0f;
   float growth = 0.0f;
 
+  float plateheight = 0.0f;
+
+  void buoyancy(){
+    growth = thickness*(1.0f-density) - height;
+    height = thickness*(1.0f-density) + plateheight;
+  }
+
 };
 
 struct Plate {
@@ -46,6 +53,7 @@ struct Plate {
   float angveloc = 0.0f;
   float mass = 0.0f;
   float inertia = 0.0f;
+  float height = 0.0f;
 
   //Parameters
   float convection = 150.0f;
@@ -54,12 +62,15 @@ struct Plate {
   void recenter(){
 
     pos = vec2(0);
+    height = 0.0f;
     for(auto&s: seg){
       pos     += *s->pos;
       mass    += s->density*s->thickness;
       inertia += pow(length(pos-*(s->pos)),2)*(s->density*s->thickness);
+      height  += s->height;
     }
     pos /= (float)seg.size();
+    height /= (float)seg.size();
 
   }
   void update(Cluster<Litho>& clus, double* hm);
@@ -68,11 +79,22 @@ struct Plate {
 
 void Plate::update(Cluster<Litho>& cluster, double* hm){
 
+  vec2 acc = vec2(0);
+  float torque = 0.0f;
+
   //Collide
 
   for(auto&s: seg){
 
-    int csind = cluster.sample(*(s->pos));
+    ivec2 ipos = *(s->pos);
+
+    if( ipos.x >= SIZE || ipos.x < 0 ||
+        ipos.y >= SIZE || ipos.y < 0){
+          s->alive = false;
+          continue;
+        }
+
+    int csind = cluster.sample(ipos);
 
     const int n = 12;
     for(int j = 0; j < n; j++){
@@ -88,10 +110,23 @@ void Plate::update(Cluster<Litho>& cluster, double* hm){
       if(segind < 0) continue;        //Non-Index (Blank Space)
       if(segind == csind) continue;   //Same Segment
 
-      //Add Torque
+      /*
+      //Colliding
 
-      s->alive = false;               //Collision
-      break;
+      vec2 dir = *(cluster.segs[segind]->pos) - *(cluster.segs[csind]->pos);
+      vec2 pdir =  *(cluster.segs[csind]->pos)-pos;
+
+      acc -= convection*dir;
+      torque += convection*length(dir)*length(pdir)*sin(angle(dir)-angle(pdir));
+      */
+
+      if(cluster.segs[segind]->density < cluster.segs[csind]->density){  //This Segment Subducts
+        s->alive = false;
+        break;
+      }
+
+      //The other segment is subducing
+    //  s->thickness += 0.01*(1.2-s->thickness);
 
     }
   }
@@ -105,20 +140,16 @@ void Plate::update(Cluster<Litho>& cluster, double* hm){
     float G = growth*(1.0f-s->thickness);
     ivec2 ip = *(s->pos);
 
-    float nd = 1.0f-hm[ip.y+ip.x*SIZE]; //Hotter = Less Dense
+    float nd = hm[ip.y+ip.x*SIZE]; //Hotter = Less Dense
 
     s->density = s->density*(s->thickness+nd*G/s->density)/(G+s->thickness);
     s->thickness += G;
 
-    s->growth = s->thickness*(1-s->density) - s->height;
-    s->height = s->thickness*(1-s->density);
+    s->buoyancy();
 
   }
 
   //Convect
-
-  vec2 acc = vec2(0);
-  float torque = 0.0f;
 
   const function<vec2(ivec2, double*)> force = [](ivec2 i, double* ff){
 
@@ -166,17 +197,6 @@ void Plate::update(Cluster<Litho>& cluster, double* hm){
     *(s->pos) = pos + length(dir)*vec2(cos(rotation+_angle),sin(rotation+_angle));
 
   }
-
-  //Cleanup
-
-  bool erased = false;
-  for(int j = 0; j < seg.size(); j++)
-    if(!seg[j]->alive){
-      seg.erase(seg.begin()+j);
-      j--;
-      erased = true;
-    }
-  if(erased) recenter();
 
 }
 
@@ -226,7 +246,7 @@ public:
 
   int SEED = 0;
   const glm::vec2 dim = glm::vec2(SIZE, SIZE);
-  const float scale = 25.0f;
+  const float scale = 50.0f;
   noise::module::Perlin perlin;
 
   vector<Plate> plates;     //Plate Storage
@@ -246,7 +266,7 @@ public:
   void update();
 
   void subduct(Shader* diffusion, Shader* subduction, Square2D* flat, int n);
-  void sediment(Shader* convection, Shader* cascasding, Square2D* flat, int n);
+  void sediment(Shader* cascasding, Square2D* flat, int n);
 
 };
 
@@ -324,7 +344,24 @@ void World::initialize(){
 
 void World::update(){
 
-  // Remove Empty Plates
+  for(auto&p: plates){
+
+    for(auto&s: p.seg){
+      ivec2 ip = *(s->pos);
+      if(ip.x < -SIZE || ip.x > 2*SIZE-1 ||
+      ip.y < -SIZE || ip.y > 2*SIZE-1) s->alive = false;
+    }
+
+    bool erased = false;
+    for(int j = 0; j < p.seg.size(); j++)
+      if(!p.seg[j]->alive){
+        p.seg.erase(p.seg.begin()+j);
+        j--;
+        erased = true;
+      }
+    if(erased) p.recenter();
+
+  }
 
   for(int i = 0; i < plates.size(); i++){
     if(plates[i].seg.size() == 0){
@@ -333,6 +370,10 @@ void World::update(){
       continue;
     }
   }
+
+  cluster.remove([](Litho* s){
+    return !s->alive;
+  });
 
   // Fill Gaps
 
@@ -350,6 +391,7 @@ void World::update(){
       //Compute Color at Scan
       //Index of the current guy in general
       int csind = cluster.sample(scan);
+
       if(csind < 0){
 
         cluster.points.push_back(scan);
@@ -393,7 +435,7 @@ void World::subduct(Shader* diffusion, Shader* subduction, Square2D* flat, int n
 
     heatB->target(false); //No-Clear Target
     diffusion->use();
-    diffusion->uniform("D", 0.1f);
+    diffusion->uniform("D", 0.2f);
     diffusion->uniform("model", mat4(1));
     diffusion->texture("map", heatA->texture);
     flat->render();
@@ -415,39 +457,43 @@ void World::subduct(Shader* diffusion, Shader* subduction, Square2D* flat, int n
 
 }
 
-void World::sediment(Shader* convection, Shader* cascading, Square2D* flat, int n){
+void World::sediment(Shader* cascading, Square2D* flat, int n){
 
   //Prepare Buffers
 
-  std::vector<vec2> speed;
   std::vector<float> height;
-  std::vector<int> alive;
   for(int i = 0; i < cluster.segs.size(); i++){
-    speed.push_back(cluster.segs[i]->speed);
-    height.push_back(cluster.segs[i]->height);
-    alive.push_back(cluster.segs[i]->alive);
+    height.push_back(cluster.segs[i]->height+cluster.segs[i]->plateheight);
   }
 
   //Add SSBO to Shader
 
   cascading->buffer("height", height);
-  convection->buffer("speed", speed);
-  convection->buffer("alive", alive);
 
   //Execute Alternating Render Pass
+
+  heightA->target(false); //No-Clear Target
+  cascading->use();
+  cascading->uniform("model", mat4(1));
+  cascading->uniform("init", true);
+  cascading->texture("map", heightB->texture);
+  cascading->texture("cluster", cluster.target->texture);
+  flat->render();
 
   for(int i = 0; i < n; i++){
 
     heightB->target(false); //No-Clear Target
-    convection->use();
-    convection->uniform("model", mat4(1));
-    convection->texture("map", heightA->texture);
-    convection->texture("cluster", cluster.target->texture);
+    cascading->use();
+    cascading->uniform("model", mat4(1));
+    cascading->uniform("init", false);
+    cascading->texture("map", heightA->texture);
+    cascading->texture("cluster", cluster.target->texture);
     flat->render();
 
     heightA->target(false); //No-Clear Target
     cascading->use();
     cascading->uniform("model", mat4(1));
+    cascading->uniform("init", false);
     cascading->texture("map", heightB->texture);
     cascading->texture("cluster", cluster.target->texture);
     flat->render();
