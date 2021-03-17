@@ -80,9 +80,8 @@ public:
 
   //Plate Centroids
   vector<vec2> centroids;  //Raw Position Buffer
-  vector<Litho*> segments; //Segment Pointer Buffer
+  vector<Segment*> segments; //Segment Pointer Buffer
   vector<Plate> plates;        //Additional Data
-  const int nplates = 24;
 
   Billboard* clustering;
   Billboard* depthmap;
@@ -92,14 +91,12 @@ public:
   Billboard* heightB;
 
   void initialize();
-  void drift();
-  void cluster(Shader* voronoi, Instance* inst);
-  void diffuse(Shader* diffusion, Shader* subduction, Square2D* flat, int n);
-  void addRock(Shader* diffusoin, Shader* sedimentation, Square2D* flat, int n);
-  void update(Instance* inst);
 
-  void addNode(glm::vec2 pos);
-  void delNode(int ind);
+  void cluster(Shader* voronoi, Instance* inst);
+  void subduct(Shader* diffusion, Shader* subduction, Square2D* flat, int n);
+  void sediment(Shader* diffusoin, Shader* sedimentation, Square2D* flat, int n);
+
+  void update(Instance* inst);
 
 };
 
@@ -122,28 +119,29 @@ void World::initialize(){
   }
 
   //Normalize Heatmap
-  for(unsigned int i = 0; i < SIZE; i++)
-    for(unsigned int j = 0; j < SIZE; j++)
+  for(int i = 0; i < SIZE; i++)
+    for(int j = 0; j < SIZE; j++)
+    //  heatmap[j+i*SIZE] = length(vec2(i-SIZE/2,j-SIZE/2))/255;
       heatmap[j+i*SIZE] = (heatmap[j+i*SIZE] - min)/(max-min);
 
  for(unsigned int i = 0; i < SIZE*SIZE; i++)
-    heightmap[i] = 0.0;
+    heightmap[i] = 0.31;
 
   //Construct a billboard, using a texture generated from the raw data
-  heatA = new Billboard(image::make<double>(vec2(SIZE, SIZE), heatmap, [](double t){
-    return mix(vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 0.0, 0.0, 1.0), t);
-  }));
-  heatB = new Billboard(image::make<double>(vec2(SIZE, SIZE), heatmap, [](double t){
-    return mix(vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 0.0, 0.0, 1.0), t);
-  }));
+  heatA = new Billboard(image::make([&](int i){
+    return mix(vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 0.0, 0.0, 1.0), heatmap[i]);
+  }, vec2(SIZE, SIZE)));
+  heatB = new Billboard(image::make([&](int i){
+    return mix(vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 0.0, 0.0, 1.0), heatmap[i]);
+  }, vec2(SIZE, SIZE)));
 
   //Construct a billboard, using a texture generated from the raw data
-  heightA = new Billboard(image::make<double>(vec2(SIZE, SIZE), heightmap, [](double t){
-    return mix(vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 1.0, 1.0, 1.0), t);
-  }));
-  heightB = new Billboard(image::make<double>(vec2(SIZE, SIZE), heightmap, [](double t){
-    return mix(vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 1.0, 1.0, 1.0), t);
-  }));
+  heightA = new Billboard(image::make([&](int i){
+    return mix(vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 1.0, 1.0, 1.0), heatmap[i]);
+  }, vec2(SIZE, SIZE)));
+  heightB = new Billboard(image::make([&](int i){
+    return mix(vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 1.0, 1.0, 1.0), heatmap[i]);
+  }, vec2(SIZE, SIZE)));
 
   //Generate Plates
   for(int i = 0; i < nplates; i++)
@@ -155,7 +153,7 @@ void World::initialize(){
   //Create Relevant Segments
   for(auto&c: centroids){
 
-    Litho* newseg = new Litho(0.5f, 0.0, &c); //Properly Scaled Position
+    Segment* newseg = new Segment(&c); //Properly Scaled Position
     segments.push_back(newseg);
 
     float dist = SIZE*SIZE;
@@ -186,7 +184,7 @@ void World::initialize(){
 
 void World::cluster(Shader* voronoi, Instance* inst){
 
-  clustering->target(glm::vec3(1));
+  clustering->target(vec3(1));
   voronoi->use();
   voronoi->uniform("R", R);
   voronoi->uniform("depthmap", false);
@@ -196,19 +194,9 @@ void World::cluster(Shader* voronoi, Instance* inst){
 
 }
 
-void World::drift(){
+void World::subduct(Shader* diffusion, Shader* subduction, Square2D* flat, int n){
 
-  for(auto& p: plates){
-    p.collide(clustermap, centroids, segments);
-    p.convect(heatmap, segments);
-    p.grow(heatmap);
-  }
-
-}
-
-void World::diffuse(Shader* diffusion, Shader* subduction, Square2D* flat, int n){
-
-  std::vector<int> colliding;
+  vector<int> colliding;
   for(int i = 0; i < segments.size(); i++){
     if(segments[i]->colliding) colliding.push_back(1);
     else colliding.push_back(0);
@@ -240,7 +228,7 @@ void World::diffuse(Shader* diffusion, Shader* subduction, Square2D* flat, int n
 
 }
 
-void World::addRock(Shader* convection, Shader* cascading, Square2D* flat, int n){
+void World::sediment(Shader* convection, Shader* cascading, Square2D* flat, int n){
 
   std::vector<vec2> speed;
   std::vector<float> height;
@@ -285,42 +273,6 @@ void World::addRock(Shader* convection, Shader* cascading, Square2D* flat, int n
 ================================================================================
 */
 
-void World::addNode(glm::vec2 pos){
-
-  centroids.push_back(pos);
-	Litho* newseg = new Litho(0.5f, 0.0f, &centroids.back()); //Properly Scaled Position
-	segments.push_back(newseg);
-
-	float dist = SIZE*SIZE;
-	Plate* nearest;
-
-	for(auto&p: plates){
-
-		if( glm::length(p.pos-pos) < dist ){
-			dist = glm::length(p.pos-pos);
-			nearest = &p;
-		}
-
-	}
-
-	nearest->seg.push_back(newseg);
-
-	for(int i = 0; i < segments.size(); i++)
-		segments[i]->pos = &centroids[i]; //Update position as well
-
-}
-
-void World::delNode(int ind){
-
-  centroids.erase(centroids.begin()+ind);
-  delete segments[ind];
-  segments.erase(segments.begin()+ind);
-
-	for(int i = 0; i < segments.size(); i++)
-		segments[i]->pos = &centroids[i]; //Update position as well
-
-}
-
 void World::update(Instance* inst){
 
   for(int i = 0; i < plates.size(); i++){
@@ -348,14 +300,18 @@ void World::update(Instance* inst){
   //Remove Colliding Segments
   for(int i = 0; i < segments.size(); i++){
     if(segments[i]->colliding){
-      delNode(i);
+      centroids.erase(centroids.begin()+i);
+      delete segments[i];
+      segments.erase(segments.begin()+i);
       i--;
     }
   }
+  for(int i = 0; i < segments.size(); i++)
+    segments[i]->pos = &centroids[i];
 
-  //This is Inefficient and Requires a better blue noise sampler
-  //Add New Nodes
+  //Add New Segments in Empty Regions
   for(auto&p: plates){
+
     for(auto&s: p.seg){
 
       float angle = (float)(rand()%100)/100.0f*2.0f*PI;
@@ -371,11 +327,19 @@ void World::update(Instance* inst){
       vec4 col = color::i2rgba(clustermap[cmind]);
 
       if(col == vec4(255)){
-        addNode(scan);
-        p.recenter();
-        break;
-      }
 
+        centroids.push_back(scan);
+      	Segment* newseg = new Segment(&centroids.back()); //Properly Scaled Position
+      	segments.push_back(newseg);
+      	p.seg.push_back(newseg);
+        p.recenter();
+
+        for(int i = 0; i < segments.size(); i++)
+          segments[i]->pos = &centroids[i];
+
+        break;
+
+      }
     }
   }
 
@@ -422,12 +386,6 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
 
       float tscale = 150.0f;
 
-      vec4 collidecolor = glm::vec4(0.7,0.64,0.52,1.0);
-      vec4 magmacolor = glm::vec4(0.84,0.17,0.05,1.0);
-      vec4 watercolor = glm::vec4(0.5,0.64,0.87,1.0);
-      vec4 earthcolor = glm::vec4(0.75,0.59,0.52,1.0);
-      vec4 stonecolor = glm::vec4(0.68,0.7,0.62,1.0);
-
       if(viewplates){
         if( aind < w->centroids.size() )
           a += glm::vec3(0, w->scale*w->segments[aind]->height, 0);
@@ -440,31 +398,17 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
       }
       if(!viewplates){
 
-        a += glm::vec3(0, tscale*(w->heightmap[i*(int)w->dim.y+j]-sealevel), 0);
-        b += glm::vec3(0, tscale*(w->heightmap[i*(int)w->dim.y+j+1]-sealevel), 0);
-        c += glm::vec3(0, tscale*(w->heightmap[(i+1)*(int)w->dim.y+j]-sealevel), 0);
-        d += glm::vec3(0, tscale*(w->heightmap[(i+1)*(int)w->dim.y+j+1]-sealevel), 0);
+        a += glm::vec3(0, tscale*(w->heightmap[i*(int)w->dim.y+j]), 0);
+        b += glm::vec3(0, tscale*(w->heightmap[i*(int)w->dim.y+j+1]), 0);
+        c += glm::vec3(0, tscale*(w->heightmap[(i+1)*(int)w->dim.y+j]), 0);
+        d += glm::vec3(0, tscale*(w->heightmap[(i+1)*(int)w->dim.y+j+1]), 0);
 
         if(a.y < tscale*sealevel) a.y = tscale*sealevel;
         if(b.y < tscale*sealevel) b.y = tscale*sealevel;
         if(c.y < tscale*sealevel) c.y = tscale*sealevel;
         if(d.y < tscale*sealevel) d.y = tscale*sealevel;
+
       }
-
-      std::function<void(std::vector<GLfloat>&, vec3&)> add3 =
-      [](std::vector<GLfloat>& v, vec3& a){
-        v.push_back(a.x);
-        v.push_back(a.y);
-        v.push_back(a.z);
-      };
-
-      std::function<void(std::vector<GLfloat>&, vec4&)> add4 =
-      [](std::vector<GLfloat>& v, vec4& a){
-        v.push_back(a.x);
-        v.push_back(a.y);
-        v.push_back(a.z);
-        v.push_back(a.w);
-      };
 
       //UPPER TRIANGLE
 
@@ -473,83 +417,88 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
       m->indices.push_back(m->positions.size()/3+1);
       m->indices.push_back(m->positions.size()/3+2);
 
-      add3(m->positions,a);
-      add3(m->positions,b);
-      add3(m->positions,c);
+      m->add(m->positions,a);
+      m->add(m->positions,b);
+      m->add(m->positions,c);
       glm::vec3 n1 = -1.0f*glm::normalize(glm::cross(a-b, c-b));
       for(int i = 0; i < 3; i++)
-        add3(m->normals,n1);
+        m->add(m->normals,n1);
+
+      vec4 tmpcol;
 
       if(viewplates){
         if(aind < w->segments.size()){
-          stonecolor = mix(magmacolor, collidecolor, w->segments[aind]->thickness);
-          add4(m->colors,stonecolor);
+          tmpcol = mix(magmacolor, collidecolor, w->segments[aind]->thickness);
+          m->add(m->colors,tmpcol);
         }
-        else add4(m->colors,magmacolor);
+        else m->add(m->colors,magmacolor);
 
         if(bind < w->segments.size()){
-          stonecolor = mix(magmacolor, collidecolor, w->segments[bind]->thickness);
-          add4(m->colors,stonecolor);
+          tmpcol = mix(magmacolor, collidecolor, w->segments[bind]->thickness);
+          m->add(m->colors,tmpcol);
         }
-        else add4(m->colors,magmacolor);
-
+        else m->add(m->colors,magmacolor);
 
         if(cind < w->segments.size()){
-          stonecolor = mix(magmacolor, collidecolor, w->segments[cind]->thickness);
-          add4(m->colors,stonecolor);
+          tmpcol = mix(magmacolor, collidecolor, w->segments[cind]->thickness);
+          m->add(m->colors,tmpcol);
         }
-        else add4(m->colors,magmacolor);
+        else m->add(m->colors,magmacolor);
       }
       else{
-        stonecolor = mix(stonecolor, earthcolor, 2*n1.y-1);
-        if(a.y <= tscale*sealevel) add4(m->colors, watercolor);
-        else add4(m->colors, stonecolor);
-        if(b.y <= tscale*sealevel) add4(m->colors, watercolor);
-        else add4(m->colors, stonecolor);
-        if(c.y <= tscale*sealevel) add4(m->colors, watercolor);
-        else add4(m->colors, stonecolor);
+        if(a.y == tscale*sealevel) m->add(m->colors, watercolor);
+        else if(n1.y > steepness) m->add(m->colors, earthcolor);
+        else m->add(m->colors, stonecolor);
+        if(b.y == tscale*sealevel) m->add(m->colors, watercolor);
+        else if(n1.y > steepness) m->add(m->colors, earthcolor);
+        else m->add(m->colors, stonecolor);
+        if(c.y == tscale*sealevel) m->add(m->colors, watercolor);
+        else if(n1.y > steepness) m->add(m->colors, earthcolor);
+        else m->add(m->colors, stonecolor);
       }
 
       m->indices.push_back(m->positions.size()/3+0);
       m->indices.push_back(m->positions.size()/3+1);
       m->indices.push_back(m->positions.size()/3+2);
 
-      add3(m->positions,d);
-      add3(m->positions,c);
-      add3(m->positions,b);
+      m->add(m->positions,d);
+      m->add(m->positions,c);
+      m->add(m->positions,b);
       glm::vec3 n2 = -1.0f*glm::normalize(glm::cross(d-c, b-c));
       for(int i = 0; i < 3; i++)
-        add3(m->normals, n2);
+        m->add(m->normals, n2);
 
       if(viewplates){
         if(dind < w->segments.size()){
-          stonecolor = mix(magmacolor, collidecolor, w->segments[dind]->thickness);
-          add4(m->colors,stonecolor);
+          tmpcol = mix(magmacolor, collidecolor, w->segments[dind]->thickness);
+          m->add(m->colors,tmpcol);
         }
-        else add4(m->colors,magmacolor);
+        else m->add(m->colors,magmacolor);
 
 
         if(cind < w->segments.size()){
-          stonecolor = mix(magmacolor, collidecolor, w->segments[cind]->thickness);
-          add4(m->colors,stonecolor);
+          tmpcol = mix(magmacolor, collidecolor, w->segments[cind]->thickness);
+          m->add(m->colors,tmpcol);
         }
-        else add4(m->colors,magmacolor);
+        else m->add(m->colors,magmacolor);
 
 
         if(bind < w->segments.size()){
-          stonecolor = mix(magmacolor, collidecolor, w->segments[bind]->thickness);
-          add4(m->colors,stonecolor);
+          tmpcol = mix(magmacolor, collidecolor, w->segments[bind]->thickness);
+          m->add(m->colors,tmpcol);
         }
-        else add4(m->colors,magmacolor);
+        else m->add(m->colors,magmacolor);
       }
       else{
-        stonecolor = mix(stonecolor, earthcolor, 2*n2.y-1);
-        if(d.y <= tscale*sealevel) add4(m->colors, watercolor);
-        else add4(m->colors, stonecolor);
-        if(c.y <= tscale*sealevel) add4(m->colors, watercolor);
-        else add4(m->colors, stonecolor);
-        if(b.y <= tscale*sealevel) add4(m->colors, watercolor);
-        else add4(m->colors, stonecolor);
+        if(d.y == tscale*sealevel) m->add(m->colors, watercolor);
+        else if(n2.y > steepness) m->add(m->colors, earthcolor);
+        else m->add(m->colors, stonecolor);
+        if(c.y == tscale*sealevel) m->add(m->colors, watercolor);
+        else if(n2.y > steepness) m->add(m->colors, earthcolor);
+        else m->add(m->colors, stonecolor);
+        if(b.y == tscale*sealevel) m->add(m->colors, watercolor);
+        else if(n2.y > steepness) m->add(m->colors, earthcolor);
+        else m->add(m->colors, stonecolor);
       }
 
     }

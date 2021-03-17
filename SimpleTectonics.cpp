@@ -1,26 +1,31 @@
-#include "TinyEngine/TinyEngine.h"
-#include "TinyEngine/include/helpers/color.h"
-#include "TinyEngine/include/helpers/image.h"
-#include "TinyEngine/include/helpers/timer.h"
+#include <TinyEngine/TinyEngine>
+#include <TinyEngine/color>
+#include <TinyEngine/image>
+#include <TinyEngine/timer>
 #include <noise/noise.h>
 #include <chrono>
 
+#define WIDTH 1000
+#define HEIGHT 1000
+#define SIZE 256
+#define DT 0.02f
+#define nplates 24
+#define K 4096
+
+float R = 2.0f*sqrt(4.0f/3.14159265f/K);
+
 #include "source/poisson.h"
 #include "source/model.h"
-
 #include "source/world.h"
-
 
 int main( int argc, char* args[] ) {
 
-	//Setup Window
 	Tiny::view.vsync = false;
 	Tiny::window("Plate Tectonics Simulation", WIDTH, HEIGHT);
 
 	Tiny::event.handler  = eventHandler;
 	Tiny::view.interface = interfaceFunc;
 
-	//Generate Seeded World
 	int SEED = time(NULL);
 	if(argc == 2)
 		SEED = std::stoi(args[1]);
@@ -39,7 +44,8 @@ int main( int argc, char* args[] ) {
 
 	//Utility Classes
 	Square2D flat;
-	Model model(tectonicmesh, &world);
+	Model platemodel(tectonicmesh, &world);
+	Model earthmodel(tectonicmesh, &world);
 	Billboard shadow(2000, 2000, true);			//Shadow Map
 
 	//Prepare instance render of flat, per-centroid
@@ -47,34 +53,55 @@ int main( int argc, char* args[] ) {
 	instance.addBuffer(world.centroids);
 
 	world.cluster(&voronoi, &instance);
-	model.construct(tectonicmesh, &world); //Reconstruct Updated Model
+	viewplates = true;
+	platemodel.construct(tectonicmesh, &world); //Reconstruct Updated Model
+	viewplates = false;
+	earthmodel.construct(tectonicmesh, &world); //Reconstruct Updated Model
 
 	world.heightB->target(vec3(0.3));
 	world.heightA->target(vec3(0.3));
 
-	//Rendering Pipeline
-
 	Tiny::view.pipeline = [&](){
 
-		shadow.target();                  																		//Prepare Target
-		depth.use();                      																		//Prepare Shader
-		model.model = glm::translate(glm::mat4(1.0), -viewPos);
-		depth.uniform("dmvp", depthProjection*depthCamera*model.model);
-		model.render(GL_TRIANGLES);       																		//Render Model
+	//	if(viewplates){
+			shadow.target(true);                  																		//Prepare Target
+			depth.use();                      																		//Prepare Shader
+			platemodel.model = glm::translate(glm::mat4(1.0), -viewPos + vec3(0,-75,0));
+			depth.uniform("dmvp", depthProjection*depthCamera*platemodel.model);
+			platemodel.render(GL_TRIANGLES);       																		//Render Model
 
-		if(viewplates) Tiny::view.target(skyCol);
-		else Tiny::view.target(skyBlue);
+			Tiny::view.target(skyBlue);
+
+			shader.use();                  																				//Prepare Shader
+			shader.texture("shadowMap", shadow.depth);
+			shader.uniform("lightCol", lightCol);
+			shader.uniform("lightPos", lightPos);
+			shader.uniform("lookDir", lookPos-cameraPos);
+			shader.uniform("lightStrength", lightStrength);
+			shader.uniform("projectionCamera", projection * camera);
+			shader.uniform("dbmvp", biasMatrix*depthProjection*depthCamera);
+			shader.uniform("model", platemodel.model);
+			platemodel.render(GL_TRIANGLES);    																				//Render Model
+	//	}
+
+		shadow.target(true);                  																//Prepare Target
+		depth.use();                      																		//Prepare Shader
+		earthmodel.model = glm::translate(glm::mat4(1.0), -viewPos + vec3(0,0,0));
+		depth.uniform("dmvp", depthProjection*depthCamera*earthmodel.model);
+		earthmodel.render(GL_TRIANGLES);       																		//Render Model
+
+		Tiny::view.target(skyBlue, false);
 
 		shader.use();                  																				//Prepare Shader
 		shader.texture("shadowMap", shadow.depth);
-    shader.uniform("lightCol", lightCol);
-    shader.uniform("lightPos", lightPos);
-    shader.uniform("lookDir", lookPos-cameraPos);
-    shader.uniform("lightStrength", lightStrength);
-    shader.uniform("projectionCamera", projection * camera);
-    shader.uniform("dbmvp", biasMatrix*depthProjection*depthCamera);
-    shader.uniform("model", model.model);
-    model.render(GL_TRIANGLES);    																				//Render Model
+		shader.uniform("lightCol", lightCol);
+		shader.uniform("lightPos", lightPos);
+		shader.uniform("lookDir", lookPos-cameraPos);
+		shader.uniform("lightStrength", lightStrength);
+		shader.uniform("projectionCamera", projection * camera);
+		shader.uniform("dbmvp", biasMatrix*depthProjection*depthCamera);
+		shader.uniform("model", earthmodel.model);
+		earthmodel.render(GL_TRIANGLES);
 
 		if(viewmap){
 
@@ -104,15 +131,27 @@ int main( int argc, char* args[] ) {
 
 		if(animate){
 
-			world.drift();
-			world.diffuse(&diffusion, &subduction, &flat, 25);
-			world.addRock(&convection, &cascading, &flat, 15);
+			//Move the Plates
+		  for(auto& p: world.plates){
+		    p.collide(world.clustermap);
+		    p.convect(world.heatmap);
+		    p.grow(world.heatmap);
+		  }
+
+			//Compute Effect on Heat and Mass
+			world.subduct(&diffusion, &subduction, &flat, 25);
+			world.sediment(&convection, &cascading, &flat, 15);
+			
 			world.update(&instance);
 			world.cluster(&voronoi, &instance);
 
-		}
+			//Construct the Models
+			viewplates = true;
+			platemodel.construct(tectonicmesh, &world);
+			viewplates = false;
+			earthmodel.construct(tectonicmesh, &world);
 
-		model.construct(tectonicmesh, &world); //Reconstruct Updated Model
+		}
 
 	});
 

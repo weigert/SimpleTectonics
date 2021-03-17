@@ -27,9 +27,10 @@ int pile(int p, int n){
   const int maxdiff = 25000;
 
   int diff = n - p;
-  int excess = int(abs(diff)/2.0f)-maxdiff;
+  if(abs(diff) < maxdiff) return diff/3;
 
-  if(abs(diff) < maxdiff) return diff/2;
+  int excess = int(abs(diff)/2.0f)-maxdiff/2;
+
   if(diff > 0) return min(excess,n);
   if(diff < 0) return -min(excess,p);
 

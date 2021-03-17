@@ -38,17 +38,18 @@ vec3 convect(float rate){
   vec2 sfy = v[num(textureOffset(cluster, p, ivec2( 1, 0)).xyz)];
   vec2 sby = v[num(textureOffset(cluster, p, ivec2(-1, 0)).xyz)];
 
-  int diff = 0;                               //Difference
+  int diff = 0;                                 //Difference
 
-  if(sfx.x > 0) diff += abs(int(sfx.x*cfx));  //Neighbor Contribution
-  if(sbx.x < 0) diff += abs(int(sbx.x*cbx));
-  if(sfy.y > 0) diff += abs(int(sfy.y*cfy));
-  if(sby.y < 0) diff += abs(int(sby.y*cby));
+  if(sfx.x > 0) diff += abs(int(sfx.x*(cfx)));  //Neighbor Contribution
+  if(sbx.x < 0) diff += abs(int(sbx.x*(cbx)));
+  if(sfy.y < 0) diff += abs(int(sfy.y*(cfy)));
+  if(sby.y > 0) diff += abs(int(sby.y*(cby)));
 
-  diff -= abs(int(s.x*c));                    //Self Distribution
+  diff -= abs(int(s.x*c));                      //Self Distribution
   diff -= abs(int(s.y*c));
 
   return col(int(c + rate*diff));
+
 }
 
 void main(){

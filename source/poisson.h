@@ -88,9 +88,9 @@ namespace sample{
   }
 
   //Sample Set of Points in Region
-  void disc(std::vector<glm::vec2>& set, int K, glm::vec2 a, glm::vec2 b){
+  void disc(std::vector<glm::vec2>& set, int k, glm::vec2 a, glm::vec2 b){
 
-    float r = sqrt(glm::dot(b-a, b-a)/3.14159265f/K);
+    float r = sqrt(glm::dot(b-a, b-a)/3.14159265f/k);
     const float length = r/sqrt(2);     //Edge Length
     const int NX = ceil((b.x-a.x)/length);
     const int NY = ceil((b.y-a.y)/length);
@@ -107,7 +107,7 @@ namespace sample{
     if(set.empty()){
       set.push_back(0.5f*(a+b)); //Center
       addGrid(set.back(), set.size());
-      K--;
+      k--;
     }
     else for(unsigned int i = 0; i < set.size(); i++)
       addGrid(set[i], i+1);
@@ -115,7 +115,7 @@ namespace sample{
     //Now Generate New Samples by Iterating over the Set
     int tries = 0;
 
-    while(K > 0){
+    while(k > 0){
 
       if(tries > set.size())
         break;
@@ -160,7 +160,7 @@ namespace sample{
       set.push_back(npos);
       addGrid(set.back(), set.size());
       tries = 0;
-      K--;
+      k--;
     }
     delete[] grid;
   }
