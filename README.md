@@ -1,6 +1,6 @@
 # SimpleTectonics
 
-C++ implementation of a clustered convection based plate tectonics simulation for procedural terrain generation
+C++-17 implementation of a clustered convection based plate tectonics simulation for procedural terrain generation
 
 Implemented using [TinyEngine](https://github.com/weigert/TinyEngine)
 
