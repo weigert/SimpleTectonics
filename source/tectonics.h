@@ -60,7 +60,7 @@ struct Plate {
   float height = 0.0f;
 
   //Parameters
-  float convection = 250.0f;
+  float convection = 150.0f;
   float growth = 0.05f;
 
   void recenter(){

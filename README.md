@@ -1,5 +1,5 @@
 #SimpleTectonics
-
+  
 This is my second / third attempt at good plate tectonics.
 
 I have learned a lot from my last attempt using large voronoi based plates.
