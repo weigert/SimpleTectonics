@@ -54,6 +54,7 @@ int main( int argc, char* args[] ) {
 	Model earthmodel(tectonicmesh, &world);
 	Billboard shadow(2000, 2000, true);			//Shadow Map
 
+/*
 	int n = 500;
 	while(n-- > 0){
 
@@ -72,7 +73,6 @@ int main( int argc, char* args[] ) {
 
 	}
 
-
 	viewsurface = true;
 
 world.sediment(&cascading, &flat, 25);
@@ -81,42 +81,46 @@ earthmodel.construct(tectonicmesh, &world); //Reconstruct Updated Model
 
 	animate = false;
 
-/*
-				//Construct the Models
-				viewplates = true;
-				platemodel.construct(tectonicmesh, &world);
-
-				if(viewsurface){
-					viewplates = false;
-					earthmodel.construct(tectonicmesh, &world);
-				}
 */
 
 
+/*
+
+*/
+
+	//Construct the Models
+	viewplates = true;
+	platemodel.construct(tectonicmesh, &world);
+
+	if(viewsurface){
+		viewplates = false;
+		earthmodel.construct(tectonicmesh, &world);
+	}
 
 	Tiny::view.pipeline = [&](){
 
+		if(viewsurface){
 
-		shadow.target(true);                  																//Prepare Target
-		depth.use();                      																		//Prepare Shader
-		earthmodel.model = glm::translate(glm::mat4(1.0), -viewPos + vec3(0,0,0));
-		depth.uniform("dmvp", depthProjection*depthCamera*earthmodel.model);
-		earthmodel.render(GL_TRIANGLES);       																		//Render Model
+			shadow.target(true);                  																//Prepare Target
+			depth.use();                      																		//Prepare Shader
+			earthmodel.model = glm::translate(glm::mat4(1.0), -viewPos + vec3(0,0,0));
+			depth.uniform("dmvp", depthProjection*depthCamera*earthmodel.model);
+			earthmodel.render(GL_TRIANGLES);       																		//Render Model
 
-		Tiny::view.target(skyBlue);
+			Tiny::view.target(skyBlue);
 
-		shader.use();                  																				//Prepare Shader
-		shader.texture("shadowMap", shadow.depth);
-		shader.uniform("lightCol", lightCol);
-		shader.uniform("lightPos", lightPos);
-		shader.uniform("lookDir", lookPos-cameraPos);
-		shader.uniform("lightStrength", lightStrength);
-		shader.uniform("projectionCamera", projection * camera);
-		shader.uniform("dbmvp", biasMatrix*depthProjection*depthCamera);
-		shader.uniform("model", earthmodel.model);
-		earthmodel.render(GL_TRIANGLES);
+			shader.use();                  																				//Prepare Shader
+			shader.texture("shadowMap", shadow.depth);
+			shader.uniform("lightCol", lightCol);
+			shader.uniform("lightPos", lightPos);
+			shader.uniform("lookDir", lookPos-cameraPos);
+			shader.uniform("lightStrength", lightStrength);
+			shader.uniform("projectionCamera", projection * camera);
+			shader.uniform("dbmvp", biasMatrix*depthProjection*depthCamera);
+			shader.uniform("model", earthmodel.model);
+			earthmodel.render(GL_TRIANGLES);
 
-
+		}
 
 		if(viewplates){
 			shadow.target(true);                  																		//Prepare Target
@@ -125,7 +129,7 @@ earthmodel.construct(tectonicmesh, &world); //Reconstruct Updated Model
 			depth.uniform("dmvp", depthProjection*depthCamera*platemodel.model);
 			platemodel.render(GL_TRIANGLES);       																		//Render Model
 
-			Tiny::view.target(glm::vec3(1));
+			Tiny::view.target(skyBlue);
 
 			shader.use();                  																				//Prepare Shader
 			shader.texture("shadowMap", shadow.depth);
@@ -137,11 +141,6 @@ earthmodel.construct(tectonicmesh, &world); //Reconstruct Updated Model
 			shader.uniform("dbmvp", biasMatrix*depthProjection*depthCamera);
 			shader.uniform("model", platemodel.model);
 			platemodel.render(GL_TRIANGLES);    																				//Render Model
-		}
-		if(viewsurface){
-
-
-
 		}
 
 		if(viewmap){
@@ -190,8 +189,9 @@ earthmodel.construct(tectonicmesh, &world); //Reconstruct Updated Model
 			world.update();
 
 			//Construct the Models
-			viewplates = true;
-			platemodel.construct(tectonicmesh, &world);
+			if(viewplates){
+				platemodel.construct(tectonicmesh, &world);
+			}
 
 			if(viewsurface){
 				viewplates = false;

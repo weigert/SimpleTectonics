@@ -147,7 +147,7 @@ void Plate::update(Cluster<Litho>& cluster, double* hm){
 
     //LINEAR GROWTH RATE [m / s]
 
-    float G = growth*(1.1-nd)*(nd-s->height);
+    float G = growth*(1.0-nd)*(nd-s->height);
     if(G < 0.0) G *= 0.1;
 
     //COMPUTE EQUILIBRIUM DENSITY (PER-VOLUME)
