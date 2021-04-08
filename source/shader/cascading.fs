@@ -1,7 +1,6 @@
 #version 430 core
 
 in vec2 ex_Tex;
-vec2 fliptex;
 out vec4 fragColor;
 
 uniform sampler2D map;
@@ -41,14 +40,14 @@ int pile(int p, int n){
 
 vec3 cascade(float rate){
 
-vec3 color = textureOffset(cluster, fliptex, ivec2(0,0)).xyz;
+vec3 color = textureOffset(cluster, ex_Tex, ivec2(0,0)).xyz;
 int c = int(255.0f*255.0f*255.0f*h[num(color)]);
 if(color == vec3(0)) return col(int(c));
 
-vec3 color0 = textureOffset(cluster, fliptex, ivec2( 1, 0)).xyz;
-vec3 color1 = textureOffset(cluster, fliptex, ivec2(-1, 0)).xyz;
-vec3 color2 = textureOffset(cluster, fliptex, ivec2( 0, 1)).xyz;
-vec3 color3 = textureOffset(cluster, fliptex, ivec2( 0,-1)).xyz;
+vec3 color0 = textureOffset(cluster, ex_Tex, ivec2( 1, 0)).xyz;
+vec3 color1 = textureOffset(cluster, ex_Tex, ivec2(-1, 0)).xyz;
+vec3 color2 = textureOffset(cluster, ex_Tex, ivec2( 0, 1)).xyz;
+vec3 color3 = textureOffset(cluster, ex_Tex, ivec2( 0,-1)).xyz;
 
 int c0 = (color0 != vec3(1))?int(255.0f*255.0f*255.0f*h[num(color0)]):0;
 int c1 = (color1 != vec3(1))?int(255.0f*255.0f*255.0f*h[num(color1)]):0;
@@ -57,14 +56,13 @@ int c3 = (color3 != vec3(1))?int(255.0f*255.0f*255.0f*h[num(color3)]):0;
 
 int ah = pile(c, c0) + pile(c, c1) + pile(c, c2) + pile(c, c3);
 
-
 return col(int(c+rate*ah));
 
 }
 
 vec3 heightcol(ivec2 offset){
 
-  vec3 color = textureOffset(cluster, fliptex, ivec2(0,0)).xyz;
+  vec3 color = textureOffset(cluster, ex_Tex, ivec2(0,0)).xyz;
   if(color == vec3(1)) return vec3(0);
   int c = int(255.0f*255.0f*255.0f*h[num(color)]);
   return col(int(c));
@@ -72,7 +70,6 @@ vec3 heightcol(ivec2 offset){
 }
 
 void main(){
-  fliptex = vec2(ex_Tex.x,1.0-ex_Tex.y);
   if(init) fragColor = vec4(heightcol(ivec2(0,0)), 1.0);
   else fragColor = vec4(cascade(0.5f), 1.0);
 }

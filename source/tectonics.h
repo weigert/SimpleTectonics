@@ -27,17 +27,18 @@ struct Litho : Segment {
 
 	Litho(vec2* p):Segment(p){}    //Constructor
 
-  float density = 0.5f;
-  float thickness = 0.1f;
-  float height = 0.0f;
-  float growth = 0.0f;
+  vec2 speed = vec2(0);       //Velocity of Segment
+  bool alive = true;          //Segment Status
+
+  float mass = 0.1f;          //Absolute Accumulated Mass
+  float thickness = 0.1f;     //Total Thickness of Plate
+
+  //Area is also known
+  float density = 0.5f;       //Density of Mass in Plate (Derived)
+  float height = 0.0f;        //Protrusion Height (Buoyant) (Derived)
+  float growth = 0.0f;        //Current Growth Rate (Mass / Cycle)
 
   float plateheight = 0.0f;
-
-  void buoyancy(){
-    growth = thickness*(1.0f-density) - height;
-    height = thickness*(1.0f-density) + plateheight;
-  }
 
 };
 
@@ -51,13 +52,16 @@ struct Plate {
   vec2 speed = vec2(0);
   float rotation = 0.0f;
   float angveloc = 0.0f;
+
   float mass = 0.0f;
+  float area = 0.0f;
+
   float inertia = 0.0f;
   float height = 0.0f;
 
   //Parameters
-  float convection = 150.0f;
-  float growth = 0.01f;
+  float convection = 250.0f;
+  float growth = 0.05f;
 
   void recenter(){
 
@@ -65,8 +69,11 @@ struct Plate {
     height = 0.0f;
     for(auto&s: seg){
       pos     += *s->pos;
-      mass    += s->density*s->thickness;
-      inertia += pow(length(pos-*(s->pos)),2)*(s->density*s->thickness);
+
+      mass    += s->mass;
+      area    += s->area;
+
+      inertia += pow(length(pos-*(s->pos)),2)*(s->mass);
       height  += s->height;
     }
     pos /= (float)seg.size();
@@ -90,6 +97,7 @@ void Plate::update(Cluster<Litho>& cluster, double* hm){
 
     if( ipos.x >= SIZE || ipos.x < 0 ||
         ipos.y >= SIZE || ipos.y < 0){
+          *(s->pos);
           s->alive = false;
           continue;
         }
@@ -100,7 +108,7 @@ void Plate::update(Cluster<Litho>& cluster, double* hm){
     for(int j = 0; j < n; j++){
 
       vec2 scan = *(s->pos);
-      scan += SIZE*R/12.0f*vec2(cos((float)j/(float)n*2.0f*PI), sin((float)j/(float)n*2.0f*PI));
+      scan += SIZE*CR*vec2(cos((float)j/(float)n*2.0f*PI), sin((float)j/(float)n*2.0f*PI));
 
       if( scan.x >= SIZE || scan.x < 0 ||
           scan.y >= SIZE || scan.y < 0) continue;
@@ -110,42 +118,47 @@ void Plate::update(Cluster<Litho>& cluster, double* hm){
       if(segind < 0) continue;        //Non-Index (Blank Space)
       if(segind == csind) continue;   //Same Segment
 
-      /*
-      //Colliding
 
-      vec2 dir = *(cluster.segs[segind]->pos) - *(cluster.segs[csind]->pos);
-      vec2 pdir =  *(cluster.segs[csind]->pos)-pos;
+      //Two Segments are Colliding, Subduce the Denser One
+      if(cluster.segs[csind]->height > cluster.segs[segind]->height){
 
-      acc -= convection*dir;
-      torque += convection*length(dir)*length(pdir)*sin(angle(dir)-angle(pdir));
-      */
-
-      if(cluster.segs[segind]->density < cluster.segs[csind]->density){  //This Segment Subducts
+      //  cluster.segs[segind]->thickness += 0.2*cluster.segs[csind]->height;  //Move Mass
         s->alive = false;
         break;
-      }
 
-      //The other segment is subducing
-    //  s->thickness += 0.01*(1.2-s->thickness);
+      }
 
     }
   }
 
   //Grow
 
+  const std::function<float(float, float)> equDensity = [&](float k, float temp){
+    return k*temp/(1.0f+k*temp);
+  };
+
   for(auto&s: seg){
 
     if(!s->alive) continue;
 
-    float G = growth*(1.0f-s->thickness);
     ivec2 ip = *(s->pos);
+    float nd = hm[ip.y+ip.x*SIZE];              //Heat Value!
 
-    float nd = hm[ip.y+ip.x*SIZE]; //Hotter = Less Dense
 
-    s->density = s->density*(s->thickness+nd*G/s->density)/(G+s->thickness);
-    s->thickness += G;
+    //LINEAR GROWTH RATE [m / s]
 
-    s->buoyancy();
+    float G = growth*(1.1-nd)*(nd-s->height);
+    if(G < 0.0) G *= 0.1;
+
+    //COMPUTE EQUILIBRIUM DENSITY (PER-VOLUME)
+    float D = equDensity(1.0f, nd);
+
+    s->mass += s->area*G*D; //m^2 * m / s * kg / m^3 = kg
+    s->thickness = s->thickness + G; //New Thickness
+    s->density = s->mass/(s->area*s->thickness);
+
+    //Height is Computed
+    s->height = s->thickness*(1.0f-s->density);
 
   }
 
@@ -172,11 +185,11 @@ void Plate::update(Cluster<Litho>& cluster, double* hm){
 
   for(auto&s: seg){
 
-    vec2 f = force(*(s->pos), hm);
+    vec2 f = -1.0f*force(*(s->pos), hm);
     vec2 dir = *(s->pos)-pos;
 
-    acc += convection*f;
-    torque += convection*length(dir)*length(f)*sin(angle(f)-angle(dir));
+    acc -= convection*f;
+    torque -= convection*length(dir)*length(f)*sin(angle(f)-angle(dir));
 
   }
 
@@ -346,11 +359,13 @@ void World::update(){
 
   for(auto&p: plates){
 
+/*
     for(auto&s: p.seg){
       ivec2 ip = *(s->pos);
       if(ip.x < -SIZE || ip.x > 2*SIZE-1 ||
       ip.y < -SIZE || ip.y > 2*SIZE-1) s->alive = false;
     }
+    */
 
     bool erased = false;
     for(int j = 0; j < p.seg.size(); j++)

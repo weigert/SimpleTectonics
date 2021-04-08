@@ -7,15 +7,16 @@
 bool animate = false;
 bool viewmap = true;
 bool viewplates = true;
+bool viewsurface = false;
 
-float sealevel = 0.32;
-float steepness = 0.95;
+float sealevel = 0.5;
+float steepness = 0.75;
 
 float zoom = 0.2;
 float zoomInc = 0.005;
 float rotation = 180.0f;
 
-glm::vec3 cameraPos = glm::vec3(-50, 50, -50);
+glm::vec3 cameraPos = glm::vec3(50, 50, 50);
 glm::vec3 lookPos = glm::vec3(0, 0, 0);
 glm::mat4 camera = glm::rotate(glm::lookAt(cameraPos, lookPos, glm::vec3(0,1,0)), glm::radians(rotation), glm::vec3(0.0f, 1.0f, 0.0f));
 glm::vec3 viewPos = glm::vec3(SIZE/2.0, 40.0, SIZE/2.0);
@@ -26,8 +27,8 @@ glm::vec3 skyCol = glm::vec4(0.17, 0.11, 0.18, 1.0f);
 glm::vec3 skyBlue = glm::vec4(0.16, 0.14, 0.14, 1.0f);
 glm::vec4 collidecolor = glm::vec4(0.7,0.64,0.52,1.0);
 glm::vec4 magmacolor = glm::vec4(0.84,0.17,0.05,1.0);
-glm::vec4 watercolor = glm::vec4(0.5,0.64,0.87,1.0);
-glm::vec4 earthcolor = glm::vec4(0.89,0.78,0.73,1.0);
+glm::vec4 watercolor = glm::vec4(0.15,0.227,0.364,1.0);
+glm::vec4 earthcolor = glm::vec4(0.20,0.33,0.17,1.0);
 glm::vec4 stonecolor = glm::vec4(0.77,0.72,0.71,1.0);
 
 glm::vec3 lightPos = glm::vec3(-100.0f, 120.0f, -150.0f);
@@ -37,6 +38,7 @@ float lightStrength = 1.4;
 float sb[3] = {skyBlue.x, skyBlue.y, skyBlue.z};
 float sc[3] = {stonecolor.x, stonecolor.y, stonecolor.z};
 float ec[3] = {earthcolor.x, earthcolor.y, earthcolor.z};
+float wb[3] = {watercolor.x, watercolor.y, watercolor.z};
 
 glm::mat4 depthModelMatrix = glm::mat4(1.0);
 glm::mat4 depthProjection = glm::ortho<float>(-300, 300, -300, 300, 0, 800);
@@ -53,9 +55,12 @@ Handle interfaceFunc = [](){
   ImGui::Text("Simulation Controller");
   ImGui::DragFloat("Sealevel", &sealevel, 0.01, 0, 1);
   ImGui::DragFloat("Steepness", &steepness, 0.01, 0, 1);
+  ImGui::Checkbox("View Surface", &viewsurface);
+  ImGui::Checkbox("Active", &animate);
   ImGui::ColorEdit3("Sky Color", sb);
   ImGui::ColorEdit3("Ground Color", ec);
   ImGui::ColorEdit3("Stone Color", sc);
+  ImGui::ColorEdit3("Water Color", wb);
   if(ImGui::Button("Set")){
     skyBlue.x = sb[0];
     skyBlue.y = sb[1];
@@ -66,7 +71,24 @@ Handle interfaceFunc = [](){
     stonecolor.x = sc[0];
     stonecolor.y = sc[1];
     stonecolor.z = sc[2];
+    watercolor.x = wb[0];
+    watercolor.y = wb[1];
+    watercolor.z = wb[2];
+
   }
+
+  skyBlue.x = sb[0];
+  skyBlue.y = sb[1];
+  skyBlue.z = sb[2];
+  earthcolor.x = ec[0];
+  earthcolor.y = ec[1];
+  earthcolor.z = ec[2];
+  stonecolor.x = sc[0];
+  stonecolor.y = sc[1];
+  stonecolor.z = sc[2];
+  watercolor.x = wb[0];
+  watercolor.y = wb[1];
+  watercolor.z = wb[2];
 
 };
 
@@ -222,19 +244,22 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
 
       if(viewplates){
         if(aind < w->cluster.segs.size()){
-          tmpcol = mix(magmacolor, collidecolor, w->cluster.segs[aind]->thickness);
+          float mixer = (w->cluster.segs[aind]->thickness > 1.0f)?1.0f:w->cluster.segs[aind]->thickness;
+          tmpcol = mix(magmacolor, collidecolor, mixer);
           m->add(m->colors,tmpcol);
         }
         else m->add(m->colors,magmacolor);
 
         if(bind < w->cluster.segs.size()){
-          tmpcol = mix(magmacolor, collidecolor, w->cluster.segs[bind]->thickness);
+          float mixer = (w->cluster.segs[bind]->thickness > 1.0f)?1.0f:w->cluster.segs[bind]->thickness;
+          tmpcol = mix(magmacolor, collidecolor, mixer);
           m->add(m->colors,tmpcol);
         }
         else m->add(m->colors,magmacolor);
 
         if(cind < w->cluster.segs.size()){
-          tmpcol = mix(magmacolor, collidecolor, w->cluster.segs[cind]->thickness);
+          float mixer = (w->cluster.segs[cind]->thickness > 1.0f)?1.0f:w->cluster.segs[cind]->thickness;
+          tmpcol = mix(magmacolor, collidecolor, mixer);
           m->add(m->colors,tmpcol);
         }
         else m->add(m->colors,magmacolor);
@@ -264,21 +289,24 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
 
       if(viewplates){
         if(dind < w->cluster.segs.size()){
-          tmpcol = mix(magmacolor, collidecolor, w->cluster.segs[dind]->thickness);
+          float mixer = (w->cluster.segs[dind]->thickness > 1.0f)?1.0f:w->cluster.segs[dind]->thickness;
+          tmpcol = mix(magmacolor, collidecolor, mixer);
           m->add(m->colors,tmpcol);
         }
         else m->add(m->colors,magmacolor);
 
 
         if(cind < w->cluster.segs.size()){
-          tmpcol = mix(magmacolor, collidecolor, w->cluster.segs[cind]->thickness);
+          float mixer = (w->cluster.segs[cind]->thickness > 1.0f)?1.0f:w->cluster.segs[cind]->thickness;
+          tmpcol = mix(magmacolor, collidecolor, mixer);
           m->add(m->colors,tmpcol);
         }
         else m->add(m->colors,magmacolor);
 
 
         if(bind < w->cluster.segs.size()){
-          tmpcol = mix(magmacolor, collidecolor, w->cluster.segs[bind]->thickness);
+          float mixer = (w->cluster.segs[bind]->thickness > 1.0f)?1.0f:w->cluster.segs[bind]->thickness;
+          tmpcol = mix(magmacolor, collidecolor, mixer);
           m->add(m->colors,tmpcol);
         }
         else m->add(m->colors,magmacolor);
