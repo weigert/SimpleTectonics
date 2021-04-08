@@ -6,6 +6,8 @@ Implemented using [TinyEngine](https://github.com/weigert/TinyEngine)
 
 Link to Blog Post: Coming Soon
 
+![Tectonics Banner with Plates and Terrain](https://github.com/weigert/SimpleTectonics/blob/master/screenshots/banner1.png)
+
 ## Compilation
 
 Use the makefile to compile the program
@@ -32,7 +34,12 @@ If no seed is specified, it will pick a random one.
 
 ## Screenshots
 
-Coming Soon
+Here are two example generations:
+
+![Plates Example 0](https://github.com/weigert/SimpleTectonics/blob/master/screenshots/plates0.png)
+![Terrain Example 0](https://github.com/weigert/SimpleTectonics/blob/master/screenshots/terrain0.png)
+![Plates Example 1](https://github.com/weigert/SimpleTectonics/blob/master/screenshots/plates1.png)
+![Terrain Example 1](https://github.com/weigert/SimpleTectonics/blob/master/screenshots/terrain1.png)
 
 ## Reading
 
