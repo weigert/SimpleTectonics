@@ -45,6 +45,11 @@ struct Litho : Segment {
 
   Plate* parent = NULL;
 
+  void buoyancy(){
+    density = mass/(area*thickness);
+    height = thickness*(1.0f-density);
+  }
+
 };
 
 struct Plate {
@@ -124,29 +129,24 @@ void Plate::update(Cluster<Litho>& cluster, double* hm){
           scan.y >= SIZE || scan.y < 0) continue;
 
       int segind = cluster.sample(scan);
-
       if(segind < 0) continue;        //Non-Index (Blank Space)
-      if(segind == csind) continue;   //Same Segment
 
       Litho* n = cluster.segs[segind];
-
-      if(n->parent == s->parent) continue;
-
+      if(n->parent == s->parent) continue;  //Same Plate (Or Same Segment)
 
       //Two Segments are Colliding, Subduce the Denser One
       if(s->density > n->density && !n->colliding){
 
-        float excessmass = s->height*s->density*s->area;
-        float additionalheight = s->height;
+        float mdiff = s->height*s->density*s->area;
+        float hdiff = s->height;
 
-        n->thickness += additionalheight;  //Move Mass
-        n->mass += excessmass;
-        n->density = n->mass/(n->area*n->thickness);
+        n->thickness += hdiff;  //Move Mass
+        n->mass += mdiff;
+        n->buoyancy();
 
         n->colliding = true;
-
         s->alive = false;
-    //    break;
+
       }
 
     }
@@ -171,9 +171,8 @@ void Plate::update(Cluster<Litho>& cluster, double* hm){
       Litho* n = cluster.segs[segind];
       if(s == n) continue;   //Same Segment
 
-//      if(s->parent != n->parent) continue; //Same Plate
-
   //    if(n->colliding) continue;
+
 
       float hdiff = s->height - n->height;
 
@@ -182,11 +181,15 @@ void Plate::update(Cluster<Litho>& cluster, double* hm){
 
       float mdiff = hdiff*s->density*s->area;
 
-      n->thickness += 0.1*hdiff;  //Move Mass
-      s->thickness -= 0.1*hdiff;
+      float trate = 0.2;
 
-      n->density = n->mass/(n->area*n->thickness);
-      s->density = s->mass/(s->area*s->thickness);
+      n->thickness += 0.5*trate*hdiff;  //Move Mass
+      s->thickness -= 0.5*trate*hdiff;
+      n->mass += 0.5*trate*mdiff;  //Move Mass
+      s->mass -= 0.5*trate*mdiff;
+
+      n->buoyancy();
+      s->buoyancy();
 
     }
 
@@ -209,9 +212,8 @@ void Plate::update(Cluster<Litho>& cluster, double* hm){
 
 
     //LINEAR GROWTH RATE [m / s]
-
-    float G = growth*(1.0-nd)*(1.0-nd-s->density*s->thickness);//*(1.0-s->height);
-    if(G < 0.0) G *= 0.1;
+    float G = growth*(1.0-nd)*(1.0-nd-s->density*s->thickness);
+    if(G < 0.0) G *= 0.05;  //Dissolution Rate
 
     //COMPUTE EQUILIBRIUM DENSITY (PER-VOLUME)
     float D = langmuir(3.0f, 1.0-nd);
