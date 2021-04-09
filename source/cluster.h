@@ -22,6 +22,17 @@ Cluster(){
   init();
 }
 
+~Cluster(){
+
+  delete target;
+  delete[] indexmap;
+  delete voronoi;
+
+  for(int i = 0; i < segs.size(); i++)
+    delete segs[i];
+
+}
+
 vector<vec2> points;     //Raw Centroid Data
 vector<T*> segs;
 
@@ -106,17 +117,6 @@ void init(){
   instance->addBuffer(points);
 
   update();
-
-}
-
-void quit(){
-
-  delete target;
-  delete[] indexmap;
-  delete voronoi;
-
-  for(int i = 0; i < segs.size(); i++)
-    delete segs[i];
 
 }
 

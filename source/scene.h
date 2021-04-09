@@ -9,12 +9,14 @@ bool viewmap = true;
 bool viewplates = true;
 bool viewsurface = false;
 
-float sealevel = 0.5;
+float sealevel = 0.25;
 float steepness = 0.75;
 
 float zoom = 0.2;
 float zoomInc = 0.005;
 float rotation = 180.0f;
+
+float tscale = 50.0f;
 
 glm::vec3 cameraPos = glm::vec3(50, 50, 50);
 glm::vec3 lookPos = glm::vec3(0, 0, 0);
@@ -55,6 +57,7 @@ Handle interfaceFunc = [](){
   ImGui::Text("Simulation Controller");
   ImGui::DragFloat("Sealevel", &sealevel, 0.01, 0, 1);
   ImGui::DragFloat("Steepness", &steepness, 0.01, 0, 1);
+  ImGui::DragFloat("Overworld Scale", &tscale, 1.0f, 10.0f, 150.0f);
   ImGui::Checkbox("View Surface", &viewsurface);
   ImGui::Checkbox("Active", &animate);
   ImGui::ColorEdit3("Sky Color", sb);
@@ -200,18 +203,19 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
       c = glm::vec3(i+1, 0.0, j  );
       d = glm::vec3(i+1, 0.0, j+1);
 
-      float tscale = 50.0f;
+     if(viewplates){
 
-      if(viewplates){
         if( aind < w->cluster.points.size() )
-          a += glm::vec3(0, w->scale*(w->cluster.segs[aind]->height + w->cluster.segs[aind]->plateheight), 0);
+          a += glm::vec3(0, w->scale*(w->cluster.segs[aind]->height), 0);
         if( bind < w->cluster.points.size() )
-          b += glm::vec3(0, w->scale*(w->cluster.segs[bind]->height + w->cluster.segs[bind]->plateheight), 0);
+          b += glm::vec3(0, w->scale*(w->cluster.segs[bind]->height), 0);
         if( cind < w->cluster.points.size() )
-          c += glm::vec3(0, w->scale*(w->cluster.segs[cind]->height + w->cluster.segs[cind]->plateheight), 0);
+          c += glm::vec3(0, w->scale*(w->cluster.segs[cind]->height), 0);
         if( dind < w->cluster.points.size() )
-          d += glm::vec3(0, w->scale*(w->cluster.segs[dind]->height + w->cluster.segs[dind]->plateheight), 0);
+          d += glm::vec3(0, w->scale*(w->cluster.segs[dind]->height), 0);
+
       }
+
       if(!viewplates){
 
         a += glm::vec3(0, tscale*(w->heightmap[i*(int)w->dim.y+j]), 0);
@@ -219,12 +223,24 @@ std::function<void(Model* m, World* w)> tectonicmesh = [](Model* m, World* w){
         c += glm::vec3(0, tscale*(w->heightmap[(i+1)*(int)w->dim.y+j]), 0);
         d += glm::vec3(0, tscale*(w->heightmap[(i+1)*(int)w->dim.y+j+1]), 0);
 
+/*
+        if( aind < w->cluster.points.size() )
+          a += glm::vec3(0, w->scale*(w->cluster.segs[aind]->height), 0);
+        if( bind < w->cluster.points.size() )
+          b += glm::vec3(0, w->scale*(w->cluster.segs[bind]->height), 0);
+        if( cind < w->cluster.points.size() )
+          c += glm::vec3(0, w->scale*(w->cluster.segs[cind]->height), 0);
+        if( dind < w->cluster.points.size() )
+          d += glm::vec3(0, w->scale*(w->cluster.segs[dind]->height), 0);
+*/
+
         if(a.y < tscale*sealevel) a.y = tscale*sealevel;
         if(b.y < tscale*sealevel) b.y = tscale*sealevel;
         if(c.y < tscale*sealevel) c.y = tscale*sealevel;
         if(d.y < tscale*sealevel) d.y = tscale*sealevel;
 
       }
+
 
       //UPPER TRIANGLE
 

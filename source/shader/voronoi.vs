@@ -11,10 +11,10 @@ out vec2 ex_Centroid;
 uniform float R;
 
 vec3 color(int i){
-  float r = ((i >>  0) & 0xff)/255.0f;
-  float g = ((i >>  8) & 0xff)/255.0f;
-  float b = ((i >> 16) & 0xff)/255.0f;
-  return vec3(r,g,b);
+  float r = ((i >>  0) & 0xff);
+  float g = ((i >>  8) & 0xff);
+  float b = ((i >> 16) & 0xff);
+  return vec3(r,g,b)/255.0f;
 }
 
 void main(){

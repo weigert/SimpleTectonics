@@ -23,12 +23,15 @@ double angle(glm::vec2 d){
 ================================================================================
 */
 
+struct Plate;
+
 struct Litho : Segment {
 
 	Litho(vec2* p):Segment(p){}    //Constructor
 
   vec2 speed = vec2(0);       //Velocity of Segment
   bool alive = true;          //Segment Status
+  bool colliding = false;
 
   float mass = 0.1f;          //Absolute Accumulated Mass
   float thickness = 0.1f;     //Total Thickness of Plate
@@ -39,6 +42,8 @@ struct Litho : Segment {
   float growth = 0.0f;        //Current Growth Rate (Mass / Cycle)
 
   float plateheight = 0.0f;
+
+  Plate* parent = NULL;
 
 };
 
@@ -60,13 +65,18 @@ struct Plate {
   float height = 0.0f;
 
   //Parameters
-  float convection = 150.0f;
+  float convection = 10.0f;
   float growth = 0.05f;
 
   void recenter(){
 
     pos = vec2(0);
     height = 0.0f;
+
+    inertia = 0.0f;
+    mass = 0.0f;
+    area = 0.0f;
+
     for(auto&s: seg){
       pos     += *s->pos;
 
@@ -104,7 +114,7 @@ void Plate::update(Cluster<Litho>& cluster, double* hm){
 
     int csind = cluster.sample(ipos);
 
-    const int n = 12;
+    int n = 12;
     for(int j = 0; j < n; j++){
 
       vec2 scan = *(s->pos);
@@ -118,23 +128,76 @@ void Plate::update(Cluster<Litho>& cluster, double* hm){
       if(segind < 0) continue;        //Non-Index (Blank Space)
       if(segind == csind) continue;   //Same Segment
 
+      Litho* n = cluster.segs[segind];
+
+      if(n->parent == s->parent) continue;
+
 
       //Two Segments are Colliding, Subduce the Denser One
-      if(cluster.segs[csind]->height > cluster.segs[segind]->height){
+      if(s->density > n->density && !n->colliding){
 
-      //  cluster.segs[segind]->thickness += 0.2*cluster.segs[csind]->height;  //Move Mass
+        float excessmass = s->height*s->density*s->area;
+        float additionalheight = s->height;
+
+        n->thickness += additionalheight;  //Move Mass
+        n->mass += excessmass;
+        n->density = n->mass/(n->area*n->thickness);
+
+        n->colliding = true;
+
         s->alive = false;
-        break;
-
+    //    break;
       }
 
     }
+
+  }
+
+  for(auto&s: cluster.segs){
+    if(!s->colliding) continue;
+
+    int n = 24;
+    for(int j = 0; j < n; j++){
+
+      vec2 scan = *(s->pos);
+      scan += SIZE*R*vec2(cos((float)j/(float)n*2.0f*PI), sin((float)j/(float)n*2.0f*PI));
+
+      if( scan.x >= SIZE || scan.x < 0 ||
+          scan.y >= SIZE || scan.y < 0) continue;
+
+      int segind = cluster.sample(scan);
+      if(segind < 0) continue;        //Non-Index (Blank Space)
+
+      Litho* n = cluster.segs[segind];
+      if(s == n) continue;   //Same Segment
+
+//      if(s->parent != n->parent) continue; //Same Plate
+
+  //    if(n->colliding) continue;
+
+      float hdiff = s->height - n->height;
+
+      hdiff -= 0.01;
+      if(hdiff < 0) continue;
+
+      float mdiff = hdiff*s->density*s->area;
+
+      n->thickness += 0.1*hdiff;  //Move Mass
+      s->thickness -= 0.1*hdiff;
+
+      n->density = n->mass/(n->area*n->thickness);
+      s->density = s->mass/(s->area*s->thickness);
+
+    }
+
+    s->colliding = false;
+
   }
 
   //Grow
 
-  const std::function<float(float, float)> equDensity = [&](float k, float temp){
-    return k*temp/(1.0f+k*temp);
+  const std::function<float(float, float)> langmuir = [&](float k, float x){
+    return k*x/(1.0f+k*x);
   };
 
   for(auto&s: seg){
@@ -147,17 +210,16 @@ void Plate::update(Cluster<Litho>& cluster, double* hm){
 
     //LINEAR GROWTH RATE [m / s]
 
-    float G = growth*(1.0-nd)*(nd-s->height);
+    float G = growth*(1.0-nd)*(1.0-nd-s->density*s->thickness);//*(1.0-s->height);
     if(G < 0.0) G *= 0.1;
 
     //COMPUTE EQUILIBRIUM DENSITY (PER-VOLUME)
-    float D = equDensity(1.0f, nd);
+    float D = langmuir(3.0f, 1.0-nd);
 
     s->mass += s->area*G*D; //m^2 * m / s * kg / m^3 = kg
     s->thickness = s->thickness + G; //New Thickness
-    s->density = s->mass/(s->area*s->thickness);
 
-    //Height is Computed
+    s->density = s->mass/(s->area*s->thickness);
     s->height = s->thickness*(1.0f-s->density);
 
   }
@@ -168,16 +230,16 @@ void Plate::update(Cluster<Litho>& cluster, double* hm){
 
     float fx, fy = 0.0f;
 
-    if(i.x > 0 && i.x < SIZE-1 && i.y > 0 && i.y < SIZE-1){
-      fx = -(ff[(i.x+1)*SIZE+i.y] - ff[(i.x-1)*SIZE+i.y])/2.0f;
+    if(i.x > 0 && i.x < SIZE-2 && i.y > 0 && i.y < SIZE-2){
+      fx = (ff[(i.x+1)*SIZE+i.y] - ff[(i.x-1)*SIZE+i.y])/2.0f;
       fy = -(ff[i.x*SIZE+i.y+1] - ff[i.x*SIZE+i.y-1])/2.0f;
     }
 
-    if(i.x <= 0) fx = 0.1f;
-    else if(i.x >= SIZE-1) fx = -0.1f;
+    if(i.x <= 0) fx = 0.0f;
+    else if(i.x >= SIZE-1) fx = -0.0f;
 
-    if(i.y <= 0) fy = 0.1;
-    else if(i.y >= SIZE-1) fy = -0.1f;
+    if(i.y <= 0) fy = 0.0;
+    else if(i.y >= SIZE-1) fy = -0.0f;
 
     return vec2(fx,fy);
 
@@ -185,7 +247,7 @@ void Plate::update(Cluster<Litho>& cluster, double* hm){
 
   for(auto&s: seg){
 
-    vec2 f = -1.0f*force(*(s->pos), hm);
+    vec2 f = force(*(s->pos), hm);
     vec2 dir = *(s->pos)-pos;
 
     acc -= convection*f;
@@ -194,7 +256,7 @@ void Plate::update(Cluster<Litho>& cluster, double* hm){
   }
 
   speed    += DT*acc/mass;
-  angveloc += DT*torque/inertia;
+  angveloc += 1E4*DT*torque/inertia;
   pos      += DT*speed;
   rotation += DT*angveloc;
 
@@ -210,6 +272,8 @@ void Plate::update(Cluster<Litho>& cluster, double* hm){
     *(s->pos) = pos + length(dir)*vec2(cos(rotation+_angle),sin(rotation+_angle));
 
   }
+
+  //speed = vec2(0);
 
 }
 
@@ -347,6 +411,7 @@ void World::initialize(){
       }
     }
     nearest->seg.push_back(s);
+    s->parent = nearest;
 
   }
 
@@ -359,13 +424,11 @@ void World::update(){
 
   for(auto&p: plates){
 
-/*
     for(auto&s: p.seg){
       ivec2 ip = *(s->pos);
       if(ip.x < -SIZE || ip.x > 2*SIZE-1 ||
       ip.y < -SIZE || ip.y > 2*SIZE-1) s->alive = false;
     }
-    */
 
     bool erased = false;
     for(int j = 0; j < p.seg.size(); j++)
@@ -411,6 +474,7 @@ void World::update(){
 
         cluster.points.push_back(scan);
         p.seg.push_back(cluster.add(cluster.points.back()));
+        p.seg.back()->parent = &p;
         cluster.reassign();
         p.recenter();
 
@@ -478,7 +542,7 @@ void World::sediment(Shader* cascading, Square2D* flat, int n){
 
   std::vector<float> height;
   for(int i = 0; i < cluster.segs.size(); i++){
-    height.push_back(cluster.segs[i]->height+cluster.segs[i]->plateheight);
+    height.push_back(cluster.segs[i]->height);
   }
 
   //Add SSBO to Shader

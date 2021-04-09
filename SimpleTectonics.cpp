@@ -16,7 +16,7 @@
 #define WIDTH 1000
 #define HEIGHT 1000
 const float R = 2.0f*sqrt(4.0f/3.14159265f/K);
-const float CR = R/16.0f;
+const float CR = R/14.0f;	//Collision Radius
 
 #include "source/poisson.h"
 #include "source/cluster.h"
@@ -189,7 +189,8 @@ earthmodel.construct(tectonicmesh, &world); //Reconstruct Updated Model
 			world.update();
 
 			//Construct the Models
-			if(viewplates){
+			if(!viewsurface){
+				viewplates = true;
 				platemodel.construct(tectonicmesh, &world);
 			}
 
@@ -202,7 +203,6 @@ earthmodel.construct(tectonicmesh, &world); //Reconstruct Updated Model
 
 	});
 
-	world.cluster.quit();
 	Tiny::quit();
 
 	return 0;
