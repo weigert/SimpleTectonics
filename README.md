@@ -4,7 +4,7 @@ C++-17 implementation of a clustered convection based plate tectonics simulation
 
 Implemented using [TinyEngine](https://github.com/weigert/TinyEngine)
 
-Link to Blog Post: Coming Soon
+[Link to Blog Post](https://nickmcd.me/2020/12/03/clustered-convection-for-simulating-plate-tectonics/)
 
 ![Tectonics Banner with Plates and Terrain](https://github.com/weigert/SimpleTectonics/blob/master/screenshots/banner1.png)
 
